@@ -5,11 +5,12 @@
 
 /dts-v1/;
 
-#include "rk3308-evb-v11.dtsi"
+#include "rk3308-voice-module-v10-aarch32.dtsi"
+#include "rk3308-voice-module-mainboard-v10-aarch32.dtsi"
 
 / {
-	model = "Rockchip RK3308 evb digital-pdm mic v11 board";
-	compatible = "rockchip,rk3308-evb-dmic-pdm-v11", "rockchip,rk3308";
+	model = "Rockchip RK3308 Voice Module PDM MIC Main Board V10 (AArch32)";
+	compatible = "rockchip,rk3308-voice-module-pdm-mainboard-v10-aarch32", "rockchip,rk3308";
 
 	pdm_i2s_dais: pdm-i2s-dais {
 		status = "okay";
@@ -50,6 +51,12 @@
 	#sound-dai-cells = <0>;
 };
 
+&i2s_8ch_2 {
+	status = "okay";
+	rockchip,no-dmaengine;
+	#sound-dai-cells = <0>;
+};
+
 &pdm_8ch {
 	status = "okay";
 	#sound-dai-cells = <0>;
@@ -63,22 +70,16 @@
 		     &pdm_m2_sdi3>;
 };
 
+&pdm_i2s_dais {
+	status = "okay";
+	#sound-dai-cells = <0>;
+};
+
 &vad {
 	status = "okay";
 	rockchip,audio-src = <&pdm_8ch>;
 	rockchip,det-channel = <0>;
 	rockchip,mode = <1>;
 	rockchip,buffer-time-ms = <200>;
-	#sound-dai-cells = <0>;
-};
-
-&i2s_8ch_2 {
-	status = "okay";
-	rockchip,no-dmaengine;
-	#sound-dai-cells = <0>;
-};
-
-&pdm_i2s_dais {
-	status = "okay";
 	#sound-dai-cells = <0>;
 };

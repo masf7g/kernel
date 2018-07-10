@@ -33,6 +33,7 @@
 #define ACODEC_REG_NUM	28
 #define VAD_SRAM_BUFFER_END	0xfffbfff8
 
+static struct snd_pcm_substream *vad_substream;
 static unsigned int voice_inactive_frames;
 module_param(voice_inactive_frames, uint, 0644);
 MODULE_PARM_DESC(voice_inactive_frames, "voice inactive frame count");
@@ -64,6 +65,7 @@ struct rockchip_vad {
 	u32 buffer_time; /* msec */
 	struct dentry *debugfs_dir;
 	void *buf;
+	bool acodec_cfg;
 };
 
 struct audio_src_addr_map {
@@ -306,7 +308,8 @@ bool snd_pcm_vad_attached(struct snd_pcm_substream *substream)
 {
 	struct rockchip_vad *vad = NULL;
 
-	vad = substream_get_drvdata(substream);
+	if (vad_substream == substream)
+		vad = substream_get_drvdata(substream);
 
 	return vad ? true : false;
 }
@@ -418,6 +421,9 @@ static int rockchip_vad_config_acodec(struct snd_pcm_hw_params *params,
 	struct snd_soc_codec *codec = dai->codec;
 	struct rockchip_vad *vad = snd_soc_codec_get_drvdata(codec);
 	unsigned int val = 0;
+
+	if (!vad->acodec_cfg)
+		return 0;
 
 	val = ACODEC_BASE + ACODEC_ADC_ANA_CON0;
 	regmap_write(vad->regmap, VAD_ID_ADDR, val);
@@ -572,6 +578,14 @@ static int rockchip_vad_enable_cpudai(struct snd_pcm_substream *substream)
 	return ret;
 }
 
+static int rockchip_vad_pcm_startup(struct snd_pcm_substream *substream,
+				    struct snd_soc_dai *dai)
+{
+	vad_substream = substream;
+
+	return 0;
+}
+
 static void rockchip_vad_pcm_shutdown(struct snd_pcm_substream *substream,
 				      struct snd_soc_dai *dai)
 {
@@ -583,6 +597,8 @@ static void rockchip_vad_pcm_shutdown(struct snd_pcm_substream *substream,
 
 	rockchip_vad_enable_cpudai(substream);
 	rockchip_vad_setup(vad);
+
+	vad_substream = NULL;
 }
 
 static int rockchip_vad_trigger(struct snd_pcm_substream *substream, int cmd,
@@ -613,6 +629,7 @@ static int rockchip_vad_trigger(struct snd_pcm_substream *substream, int cmd,
 static struct snd_soc_dai_ops rockchip_vad_dai_ops = {
 	.hw_params = rockchip_vad_hw_params,
 	.shutdown = rockchip_vad_pcm_shutdown,
+	.startup = rockchip_vad_pcm_startup,
 	.trigger = rockchip_vad_trigger,
 };
 
@@ -729,6 +746,7 @@ static int rockchip_vad_probe(struct platform_device *pdev)
 
 	vad->dev = &pdev->dev;
 
+	vad->acodec_cfg = of_property_read_bool(np, "rockchip,acodec-cfg");
 	of_property_read_u32(np, "rockchip,mode", &vad->mode);
 	of_property_read_u32(np, "rockchip,det-channel", &vad->audio_chnl);
 	of_property_read_u32(np, "rockchip,buffer-time-ms", &vad->buffer_time);

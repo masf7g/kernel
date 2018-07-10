@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-2.0+
  */
 #include <linux/clk.h>
+#include <linux/cpufreq.h>
 #include <linux/nvmem-consumer.h>
 #include <linux/regulator/consumer.h>
 #include <linux/slab.h>
@@ -589,7 +590,7 @@ static int rockchip_adjust_opp_by_irdrop(struct device *dev,
 	count = dev_pm_opp_get_opp_count(dev);
 	if (count <= 0) {
 		ret = count ? count : -ENODATA;
-		goto out;
+		goto unlock;
 	}
 
 	for (i = 0, rate = 0; i < count; i++, rate++) {
@@ -597,7 +598,7 @@ static int rockchip_adjust_opp_by_irdrop(struct device *dev,
 		opp = dev_pm_opp_find_freq_ceil(dev, &rate);
 		if (IS_ERR(opp)) {
 			ret = PTR_ERR(opp);
-			goto out;
+			goto unlock;
 		}
 		board_irdrop = rockchip_of_get_irdrop(np, opp->rate);
 		if (IS_ERR_VALUE(board_irdrop))
@@ -620,9 +621,18 @@ static int rockchip_adjust_opp_by_irdrop(struct device *dev,
 		}
 	}
 
-	clk = of_clk_get_by_name(np, NULL);
-	if (IS_ERR(clk))
+unlock:
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+	rcu_read_unlock();
+#endif
+	if (ret)
 		goto out;
+
+	clk = of_clk_get_by_name(np, NULL);
+	if (IS_ERR(clk)) {
+		ret = PTR_ERR(clk);
+		goto out;
+	}
 	if (safe_opp && safe_opp != opp && irdrop_scale) {
 		*irdrop_scale = rockchip_pll_clk_rate_to_scale(clk,
 							       safe_opp->rate);
@@ -633,9 +643,6 @@ static int rockchip_adjust_opp_by_irdrop(struct device *dev,
 	clk_put(clk);
 
 out:
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
-	rcu_read_unlock();
-#endif
 	return ret;
 }
 
@@ -677,7 +684,7 @@ int rockchip_adjust_power_scale(struct device *dev, int scale)
 	struct device_node *np;
 	struct clk *clk;
 	int irdrop_scale = 0, opp_scale = 0;
-	u32 target_scale, avs_enable = 0, avs_scale = 0;
+	u32 target_scale, avs = 0, avs_scale = 0;
 	long scale_rate = 0;
 	int ret = 0;
 
@@ -686,14 +693,15 @@ int rockchip_adjust_power_scale(struct device *dev, int scale)
 		dev_warn(dev, "OPP-v2 not supported\n");
 		return -ENOENT;
 	}
-	of_property_read_u32(np, "rockchip,avs-enable", &avs_enable);
+	of_property_read_u32(np, "rockchip,avs-enable", &avs);
+	of_property_read_u32(np, "rockchip,avs", &avs);
 	of_property_read_u32(np, "rockchip,avs-scale", &avs_scale);
 
 	rockchip_adjust_opp_by_irdrop(dev, np, &irdrop_scale, &opp_scale);
 	target_scale = max(irdrop_scale, scale);
 	if (target_scale <= 0)
 		return 0;
-	dev_info(dev, "target-scale=%d\n", target_scale);
+	dev_info(dev, "avs=%d, target-scale=%d\n", avs, target_scale);
 
 	clk = of_clk_get_by_name(np, NULL);
 	if (IS_ERR(clk)) {
@@ -701,7 +709,7 @@ int rockchip_adjust_power_scale(struct device *dev, int scale)
 		goto np_err;
 	}
 
-	if (avs_enable) {
+	if (avs == 1) {
 		ret = rockchip_pll_clk_adaptive_scaling(clk, target_scale);
 		if (ret)
 			dev_err(dev, "Failed to adaptive scaling\n");
@@ -731,9 +739,15 @@ int rockchip_adjust_power_scale(struct device *dev, int scale)
 			goto clk_err;
 		}
 		dev_info(dev, "scale_rate=%lu\n", scale_rate);
-		ret = rockchip_adjust_opp_table(dev, scale_rate);
-		if (ret)
-			dev_err(dev, "Failed to adjust opp table\n");
+		if (avs == 2) {
+			ret = rockchip_cpufreq_set_scale_rate(dev, scale_rate);
+			if (ret)
+				dev_err(dev, "Failed to set cpu scale rate\n");
+		} else {
+			ret = rockchip_adjust_opp_table(dev, scale_rate);
+			if (ret)
+				dev_err(dev, "Failed to adjust opp table\n");
+		}
 	}
 
 clk_err:
@@ -762,7 +776,7 @@ int rockchip_init_opp_table(struct device *dev,
 	}
 	of_node_put(np);
 
-	rockchip_get_soc_info(dev, NULL, &bin, &process);
+	rockchip_get_soc_info(dev, matches, &bin, &process);
 	rockchip_get_scale_volt_sel(dev, lkg_name, reg_name, bin, process,
 				    &scale, &volt_sel);
 	rockchip_set_opp_info(dev, process, volt_sel);
