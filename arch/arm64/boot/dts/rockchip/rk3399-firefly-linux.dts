@@ -247,6 +247,18 @@
 		regulator-name = "vcc3v3_pcie";
 	};
 
+       vcc3v3_3g: vcc3v3-3g-regulator {
+                compatible = "regulator-fixed";
+                enable-active-high;
+                regulator-always-on;
+                regulator-boot-on;
+                gpio = <&gpio0 2 GPIO_ACTIVE_HIGH>;
+                pinctrl-names = "default";
+                pinctrl-0 = <&pcie_3g_drv>;
+                regulator-name = "vcc3v3_3g";
+        };
+
+
 	vcc3v3_sys: vcc3v3-sys {
 		compatible = "regulator-fixed";
 		regulator-name = "vcc3v3_sys";
@@ -287,7 +299,7 @@
 		pwms = <&pwm2 0 25000 1>;
 		regulator-name = "vdd_log";
 		regulator-min-microvolt = <800000>;
-		regulator-max-microvolt = <1400000>;
+		regulator-max-microvolt = <1100000>;
 		regulator-always-on;
 		regulator-boot-on;
 
@@ -335,6 +347,8 @@
 	wireless-bluetooth {
 		compatible = "bluetooth-platdata";
 		//wifi-bt-power-toggle;
+		clocks = <&rk808 1>;
+		clock-names = "ext_clock";
 		uart_rts_gpios = <&gpio2 19 GPIO_ACTIVE_LOW>; /* GPIO2_C3 */
 		pinctrl-names = "default", "rts_gpio";
 		pinctrl-0 = <&uart0_rts>;
@@ -345,6 +359,26 @@
 		BT,wake_host_irq = <&gpio0 4 GPIO_ACTIVE_HIGH>; /* GPIO0_A4 */
 		status = "okay";
 	};
+
+    leds {
+       compatible = "gpio-leds";
+       power {
+           label = "firefly:blue:power";
+           linux,default-trigger = "ir-power-click";
+           default-state = "on";
+           gpios = <&gpio2 27 GPIO_ACTIVE_HIGH>;
+           pinctrl-names = "default";
+           pinctrl-0 = <&led_power>;
+       };
+       user {
+           label = "firefly:yellow:user";
+           linux,default-trigger = "ir-user-click";
+           default-state = "off";
+           gpios = <&gpio0 13 GPIO_ACTIVE_HIGH>;
+           pinctrl-names = "default";
+           pinctrl-0 = <&led_user>;
+       };
+   };
 };
 
 &cpu_l0 {
@@ -408,7 +442,7 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&rgmii_pins>;
 	tx_delay = <0x28>;
-	rx_delay = <0x11>;
+	rx_delay = <0x1B>;
 	status = "okay";
 };
 
@@ -472,8 +506,10 @@
 		reg = <0x1b>;
 		interrupt-parent = <&gpio1>;
 		interrupts = <21 IRQ_TYPE_LEVEL_LOW>;
+		pmic,stby-gpio = <&gpio1 24 GPIO_ACTIVE_LOW>;
+		pmic,hold-gpio = <&gpio1 13 GPIO_ACTIVE_HIGH>;
 		pinctrl-names = "default";
-		pinctrl-0 = <&pmic_int_l &pmic_dvs2>;
+		pinctrl-0 = <&pmic_int_l &pmic_dvs2 &pmic_stby &pmic_hold>;
 		rockchip,system-power-controller;
 		wakeup-source;
 		#clock-cells = <1>;
@@ -576,11 +612,11 @@
 				regulator-always-on;
 				regulator-boot-on;
 				regulator-min-microvolt = <1800000>;
-				regulator-max-microvolt = <3000000>;
+				regulator-max-microvolt = <3300000>;
 				regulator-name = "vcc_sd";
 				regulator-state-mem {
 					regulator-on-in-suspend;
-					regulator-suspend-microvolt = <3000000>;
+					regulator-suspend-microvolt = <3300000>;
 				};
 			};
 
@@ -717,8 +753,8 @@
 
 &i2c4 {
 	status = "okay";
-	i2c-scl-rising-time-ns = <600>;
-	i2c-scl-falling-time-ns = <20>;
+	i2c-scl-rising-time-ns = <475>;
+	i2c-scl-falling-time-ns = <26>;
 
 	fusb0: fusb30x@22 {
 		compatible = "fairchild,fusb302";
@@ -726,17 +762,17 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&fusb0_int>;
 		int-n-gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
-		vbus-5v-gpios = <&gpio2 0 GPIO_ACTIVE_HIGH>;
+		vbus-5v-gpios = <&gpio1 3 GPIO_ACTIVE_HIGH>;
 		status = "okay";
 	};
 
-	gsl3680: gsl3680@41 {
+	gsl3680: gsl3680@40 {
 		status = "disabled";
-		compatible = "gslX680-pad";
-		reg = <0x41>;
+		compatible = "gslX680";
+		reg = <0x40>;
 		screen_max_x = <1536>;
 		screen_max_y = <2048>;
-		touch-gpio = <&gpio1 20 IRQ_TYPE_LEVEL_LOW>;
+		touch-gpio = <&gpio4 28 IRQ_TYPE_LEVEL_LOW>;
 		reset-gpio = <&gpio0 12 GPIO_ACTIVE_HIGH>;
 	};
 
@@ -760,6 +796,8 @@
 	rockchip,i2s-broken-burst-len;
 	rockchip,playback-channels = <8>;
 	rockchip,capture-channels = <8>;
+        //assigned-clocks = <&cru SCLK_I2S0_DIV>, <&cru SCLK_I2S_8CH>;
+        //assigned-clock-parents = <&cru PLL_GPLL>, <&cru SCLK_I2S0_8CH>;
 	#sound-dai-cells = <0>;
 };
 
@@ -768,6 +806,8 @@
 	rockchip,i2s-broken-burst-len;
 	rockchip,playback-channels = <2>;
 	rockchip,capture-channels = <2>;
+        //assigned-clocks = <&cru SCLK_I2S1_DIV>, <&cru SCLK_I2S_8CH>;
+        //assigned-clock-parents = <&cru PLL_GPLL>, <&cru SCLK_I2S1_8CH>;
 	#sound-dai-cells = <0>;
 };
 
@@ -824,7 +864,8 @@
 			rockchip,pins =
 				<1 17 RK_FUNC_GPIO &pcfg_pull_none>;
 			};
-			pcie_3g_drv: pcie-3g-drv {
+
+		pcie_3g_drv: pcie-3g-drv {
 			rockchip,pins =
 				<0 2 RK_FUNC_GPIO &pcfg_pull_up>;
 		};
@@ -840,6 +881,16 @@
 			rockchip,pins =
 			<1 14 RK_FUNC_GPIO &pcfg_pull_down>;
 		};
+
+ 		    pmic_stby: pmic-stby {
+		             rockchip,pins =
+	                     <1 24 RK_FUNC_GPIO &pcfg_pull_up>;
+		     };
+
+		     pmic_hold: pmic-hold{
+		             rockchip,pins =
+	                     <1 13 RK_FUNC_GPIO &pcfg_pull_up>;
+ 		    };
 	};
 
 	sdio-pwrseq {
@@ -855,6 +906,19 @@
 				<2 19 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
+
+  leds {
+    led_power: led-power {
+      rockchip,pins =
+        <2 27 RK_FUNC_GPIO &pcfg_pull_none>;
+    };
+
+    led_user: led-user {
+      rockchip,pins =
+        <0 13 RK_FUNC_GPIO &pcfg_pull_none>;
+    };
+  };
+
 
 	rt5640 {
 		rt5640_hpcon: rt5640-hpcon {
@@ -910,6 +974,25 @@
 
 &route_edp {
 	status = "disabled";
+};
+
+&route_hdmi {
+        status = "okay";
+        logo,mode = "center";
+};
+
+&cdn_dp {
+        status = "disabled";
+        extcon = <&fusb0>;
+        phys = <&tcphy0_dp>;
+};
+
+&dp_in_vopb {
+        status = "disabled";
+};
+
+&hdmi_in_vopl {
+        status = "disabled";
 };
 
 &saradc {
@@ -1009,6 +1092,31 @@
 	};
 };
 
+&pwm3 {
+        status = "okay";
+        interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH 0>;
+        compatible = "rockchip,remotectl-pwm";
+        remote_pwm_id = <3>;
+        handle_cpu_id = <0>;
+
+    ir_key1 {
+        rockchip,usercode = <0xff00>;
+        rockchip,key_table =
+            <0xeb   KEY_POWER>,
+            <0xec   KEY_COMPOSE>,
+            <0xfe   KEY_BACK>,
+            <0xb7   KEY_HOME>,
+            <0xa3   KEY_WWW>,
+            <0xf4   KEY_VOLUMEUP>,
+            <0xa7   KEY_VOLUMEDOWN>,
+            <0xf8   KEY_ENTER>,
+            <0xfc   KEY_UP>,
+            <0xfd   KEY_DOWN>,
+            <0xf1   KEY_LEFT>,
+            <0xe5   KEY_RIGHT>;
+    };
+};
+
 &uart0 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&uart0_xfer &uart0_cts>;
@@ -1017,6 +1125,12 @@
 
 &uart2 {
 	status = "okay";
+};
+
+&uart4 {
+        current-speed = <9600>;
+        no-loopback-test;
+        status = "okay";
 };
 
 &usbdrd3_0 {
