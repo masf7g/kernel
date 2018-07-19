@@ -113,6 +113,45 @@
 		reset-gpios = <&gpio1 3 GPIO_ACTIVE_LOW>;
 	};
 
+	sound-rk312x {
+		compatible = "simple-audio-card";
+		status = "disabled";
+
+		simple-audio-card,format = "i2s";
+		simple-audio-card,mclk-fs = <256>;
+		simple-audio-card,name = "rockchip,rk312x-codec";
+		simple-audio-card,cpu {
+			sound-dai = <&i2s_8ch>;
+		};
+		simple-audio-card,codec {
+			sound-dai = <&codec>;
+		};
+	};
+
+	sound-es8396 {
+		compatible = "simple-audio-card";
+		status = "okay";
+
+		simple-audio-card,format = "i2s";
+		simple-audio-card,name = "rockchip,es8396-codec";
+		simple-audio-card,mclk-fs = <256>;
+		simple-audio-card,widgets =
+			"Microphone", "Microphone Jack",
+			"Line", "Microphone Headset",
+			"Headphone", "Headphone Jack";
+		simple-audio-card,routing =
+			"MIC", "Microphone Jack",
+			"DMIC", "Microphone Headset",
+			"Headphone Jack", "LOUTP",
+			"Headphone Jack", "ROUTN";
+		simple-audio-card,cpu {
+			sound-dai = <&i2s_2ch>;
+		};
+		simple-audio-card,codec {
+			sound-dai = <&es8396>;
+		};
+	};
+
 	usb_control {
 		compatible = "rockchip,rk3126-usb-control";
 
@@ -145,6 +184,14 @@
 		vin-supply = <&vcc_io>;
 	};
 
+	vcc_cvbs_33: vcc-cvbs-33 {
+		compatible = "regulator-fixed";
+		regulator-name= "vcc-cvbs-33";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		vin-supply = <&pmic_vcc_cvbs_33>;
+	};
+
 	vcc_sys: vcc-sys {
 		compatible = "regulator-fixed";
 		regulator-name = "vcc_sys";
@@ -171,6 +218,22 @@
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
 		vin-supply = <&vcc_io>;
+	};
+
+	dvdd_1v8: dvdd-1v8 {
+		compatible = "regulator-fixed";
+		regulator-name = "dvdd-1v8";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		vin-supply = <&vcc_18>;
+	};
+
+	dvdd_3v3: dvdd-3v3 {
+		compatible = "regulator-fixed";
+		regulator-name = "dvdd-3v3";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		vin-supply = <&vcc_cvbs_33>;
 	};
 
 	wireless-bluetooth {
@@ -233,6 +296,32 @@
 			};
 		};
 	};
+};
+
+&cif_new {
+	status = "okay";
+
+	port {
+		cif_in: endpoint {
+			remote-endpoint = <&adv7181_out>;
+			vsync-active = <0>;
+			hsync-active = <1>;
+		};
+	};
+};
+
+&codec {
+	#sound-dai-cells = <0>;
+	hp-ctl-gpios = <&gpio3 20 GPIO_ACTIVE_HIGH>;
+	spk-ctl-gpios = <&gpio0 30 GPIO_ACTIVE_HIGH>;
+	spk-mute-delay = <200>;
+	hp-mute-delay = <100>;
+	spk_volume = <25>;
+	hp_volume = <25>;
+	capture_volume = <26>;
+	gpio_debug = <1>;
+	codec_hp_det = <1>;
+	status = "disabled";
 };
 
 &cpu0 {
@@ -415,8 +504,6 @@
 				regulator-name= "pmic-vcc-cvbs-33";
 				regulator-min-microvolt = <3300000>;
 				regulator-max-microvolt = <3300000>;
-				regulator-always-on;
-				regulator-boot-on;
 				regulator-state-mem {
 					regulator-off-in-suspend;
 				};
@@ -449,7 +536,8 @@
 &i2c2 {
 	status = "okay";
 	clock-frequency = <400000>;
-	ts@14 {
+
+	touchscreen: ts@14 {
 		compatible = "goodix,gt9xx";
 		reg = <0x14>;
 		touch-gpio = <&gpio1 8 IRQ_TYPE_LEVEL_LOW>;
@@ -461,6 +549,49 @@
 		tp-supply = <&pmic_vcc_tp_33>;
 		status = "okay";
 	};
+
+	camera: adv7181@21 {
+		compatible = "adi,adv7181";
+		reg = <0x21>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&cif_rst>;
+
+		dvdd-supply = <&dvdd_1v8>;
+		dvddio-supply = <&dvdd_3v3>;
+		reset-gpios = <&gpio3 11 GPIO_ACTIVE_LOW>;
+
+		status = "okay";
+
+		port {
+			adv7181_out: endpoint {
+				remote-endpoint = <&cif_in>;
+			};
+		};
+	};
+
+	es8396: es8396@11 {
+		status = "okay";
+		#sound-dai-cells = <0>;
+		compatible = "es8396";
+		reg = <0x11>;
+		clock-names = "mclk";
+		clocks = <&cru SCLK_I2S_OUT>;
+		spk-con-gpio = <&gpio0 30 GPIO_ACTIVE_HIGH>;
+		lineout-con-gpio = <&gpio3 20 GPIO_ACTIVE_HIGH>;
+	};
+};
+
+&i2s_2ch {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2s_bus>;
+	#sound-dai-cells = <0>;
+	status = "okay";
+};
+
+&i2s_8ch {
+	#sound-dai-cells = <0>;
+	status = "disabled";
 };
 
 &pwm0 {
@@ -543,6 +674,12 @@
 };
 
 &pinctrl {
+	camera {
+		cif_rst: cif-rst {
+			rockchip,pins = <3 11 RK_FUNC_GPIO &pcfg_pull_default>;
+		};
+	};
+
 	pmic {
 		pmic_int_l: pmic-int-l {
 			rockchip,pins = <1 11 RK_FUNC_GPIO &pcfg_pull_default>;

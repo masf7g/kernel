@@ -211,7 +211,8 @@ static inline void limit_reserve_root(struct f2fs_sb_info *sbi)
 
 	/* limit is 0.2% */
 	if (test_opt(sbi, RESERVE_ROOT) &&
-			F2FS_OPTION(sbi).root_reserved_blocks > limit) {
+			F2FS_OPTION(sbi).root_reserved_blocks > limit &&
+			F2FS_OPTION(sbi).root_reserved_blocks > MIN_ROOT_RESERVED_BLOCKS) {
 		F2FS_OPTION(sbi).root_reserved_blocks = limit;
 		f2fs_msg(sbi->sb, KERN_INFO,
 			"Reduce reserved blocks for root = %u",
@@ -740,6 +741,10 @@ static int parse_options(struct super_block *sb, char *options)
 			} else if (strlen(name) == 6 &&
 					!strncmp(name, "strict", 6)) {
 				F2FS_OPTION(sbi).fsync_mode = FSYNC_MODE_STRICT;
+			} else if (strlen(name) == 9 &&
+					!strncmp(name, "nobarrier", 9)) {
+				F2FS_OPTION(sbi).fsync_mode =
+							FSYNC_MODE_NOBARRIER;
 			} else {
 				kfree(name);
 				return -EINVAL;
