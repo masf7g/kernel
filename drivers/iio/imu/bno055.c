@@ -32,6 +32,8 @@
 #define BNO055_REG_GYR_DATA_X_LSB	0x14
 #define BNO055_REG_EUL_HEADING_LSB	0x1A
 #define BNO055_REG_QUA_DATA_W_LSB	0x20
+#define BNO055_REG_LIA_DATA_X_LSB	0x28
+#define BNO055_REG_GRV_DATA_X_LSB	0x2E
 #define BNO055_REG_TEMP			0x34
 
 #define BNO055_REG_SYS_ERR		0x3A
@@ -446,7 +448,7 @@ static int bno055_init_channels(struct iio_dev *indio_dev)
 	    /* All fusion modes use the accelerometer. */
 	    data->op_mode >= BNO055_MODE_IMU) {
 		bno055_init_simple_channels(p, IIO_ACCEL,
-					    BNO055_REG_ACC_DATA_X_LSB,
+					    data->op_mode >= BNO055_MODE_IMU ? BNO055_REG_LIA_DATA_X_LSB : BNO055_REG_ACC_DATA_X_LSB,	/* User linear acceleration in fusion modes */
 					    has_offset);
 		p += 3;
 	}
