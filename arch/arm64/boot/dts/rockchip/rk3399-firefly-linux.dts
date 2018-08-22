@@ -489,6 +489,8 @@
 		vin-supply = <&vcc5v0_sys>;
 		regulator-compatible = "fan53555-reg";
 		regulator-name = "vdd_gpu";
+                pinctrl-0 = <&vsel2_gpio>;
+                vsel-gpios = <&gpio1 14 0>;
 		regulator-min-microvolt = <712500>;
 		regulator-max-microvolt = <1500000>;
 		regulator-ramp-delay = <1000>;
