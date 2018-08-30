@@ -709,6 +709,20 @@
 		irq-gpio = <&gpio1 4 IRQ_TYPE_LEVEL_LOW>;
 		mpu-debug = <1>;
 	};
+
+        bme280: bme280@77 {
+                compatible = "bosch,bme280";
+                reg = <0x77>;
+                status = "okay";
+        };
+  
+        bno055: bno055@28 {
+                compatible = "bosch,bno055";
+                reg = <0x28>;
+                bosch,operation-mode = <12>;
+                status = "okay";
+        };
+
 };
 
 &i2s0 {
