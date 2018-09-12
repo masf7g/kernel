@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 FUKAUMI Naoki <naobsd@gmail.com>
+ * Copyright (c) 2016 Fuzhou Rockchip Electronics Co., Ltd
  *
  * This file is dual-licensed: you can use it either under the terms
  * of the GPL or the X11 license, at your option. Note that this dual
@@ -41,31 +41,100 @@
  */
 
 /dts-v1/;
-#include "rk3288-firefly.dtsi"
+
+#include "rk3399-firefly-port.dtsi"
 
 / {
-	model = "Firefly-RK3288 Beta";
-	compatible = "firefly,firefly-rk3288-beta", "rockchip,rk3288";
-};
+	model = "Firefly-RK3399 Board EDP LP079QX1 (Linux Opensource)";
+	compatible = "rockchip,rk3399-firefly", "rockchip,rk3399";
 
-&ir {
-	gpios = <&gpio7 5 GPIO_ACTIVE_LOW>;
-};
-
-&pinctrl {
-	act8846 {
-		pmic_vsel: pmic-vsel {
-			rockchip,pins = <7 1 RK_FUNC_GPIO &pcfg_output_low>;
-		};
+	test-power {
+		status = "okay";
 	};
 
-	ir {
-		ir_int: ir-int {
-			rockchip,pins = <7 5 RK_FUNC_GPIO &pcfg_pull_up>;
-		};
+	vcc_lcd: vcc-lcd {
+		compatible = "regulator-fixed";
+		enable-active-high;
+		gpio = <&gpio1 1 GPIO_ACTIVE_HIGH>;
+		regulator-always-on;
+		regulator-boot-on;
+		regulator-name = "vcc_lcd";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		startup-delay-us = <20000>;
+		vin-supply = <&vcc_3v0>;
 	};
 };
 
-&pwm0 {
+&backlight {
+    status = "okay";
+};
+
+&edp_panel {
+	compatible = "sharp,lcd-f402", "panel-simple";
+	backlight = <&backlight>;
+	power-supply = <&vcc_lcd>;
+	reset-gpios = <&gpio4 29 GPIO_ACTIVE_LOW>;
 	status = "okay";
+};
+
+&edp {
+	status = "okay";
+};
+
+&route_edp {
+	status = "okay";
+	logo,mode = "center";
+};
+
+&edp_in_vopl {
+	status = "disabled";
+};
+
+&hdmi_dp_sound {
+	status = "okay";
+};
+
+&i2c4 {
+	status = "okay";
+
+	gsl3680: gsl3680@41 {
+		status = "okay";
+		compatible = "gslX680";
+		reg = <0x41>;
+		screen_max_x = <1536>;
+		screen_max_y = <2048>;
+		touch-gpio = <&gpio1 20 IRQ_TYPE_LEVEL_LOW>;
+		reset-gpio = <&gpio0 12 GPIO_ACTIVE_HIGH>;
+	};
+
+	mpu6050: mpu@68 {
+		status = "okay";
+		compatible = "invensense,mpu6050";
+		reg = <0x68>;
+		irq-gpio = <&gpio1 4 IRQ_TYPE_LEVEL_LOW>;
+		mpu-debug = <1>;
+		mpu-int_config = <0x10>;
+		mpu-level_shifter = <0>;
+		mpu-orientation = <0 1 0 1 0 0 0 0 1>;
+		orientation-x= <1>;
+		orientation-y= <1>;
+		orientation-z= <1>;
+	};
+};
+
+&uart4 {
+	status = "okay";
+};
+
+&dp_in_vopb {
+	status = "disabled";
+};
+
+&hdmi_in_vopb {
+	status = "disabled";
+};
+
+&wdt {
+	status = "disabled";
 };

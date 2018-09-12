@@ -125,6 +125,8 @@ struct pltfrm_cam_itf {
 				(PLTFRM_CIFCAM_IOCTL_INTERNAL_BASE + 2)
 #define PLTFRM_CIFCAM_ATTACH    \
 				(PLTFRM_CIFCAM_IOCTL_INTERNAL_BASE + 3)
+#define PLTFRM_CIFCAM_VCM_INFO \
+				(PLTFRM_CIFCAM_IOCTL_INTERNAL_BASE + 6)
 
 struct pltfrm_cam_defrect {
 	unsigned int width;

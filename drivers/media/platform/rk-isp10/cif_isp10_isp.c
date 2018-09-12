@@ -2245,14 +2245,14 @@ static void cifisp_afc_config(const struct cif_isp10_isp_dev *isp_dev)
 
 	for (i = 0; i < num_of_win; i++) {
 		cifisp_iowrite32(
-			CIFISP_AFC_WINDOW_X(pconfig->afm_win[0].h_offs) |
-			CIFISP_AFC_WINDOW_Y(pconfig->afm_win[0].v_offs),
+			CIFISP_AFC_WINDOW_X(pconfig->afm_win[i].h_offs) |
+			CIFISP_AFC_WINDOW_Y(pconfig->afm_win[i].v_offs),
 			CIF_ISP_AFM_LT_A + i * 8);
 		cifisp_iowrite32(
-			CIFISP_AFC_WINDOW_X(pconfig->afm_win[0].h_size +
-			pconfig->afm_win[0].h_offs) |
-			CIFISP_AFC_WINDOW_Y(pconfig->afm_win[0].v_size +
-			pconfig->afm_win[0].v_offs),
+			CIFISP_AFC_WINDOW_X(pconfig->afm_win[i].h_size +
+			pconfig->afm_win[i].h_offs) |
+			CIFISP_AFC_WINDOW_Y(pconfig->afm_win[i].v_size +
+			pconfig->afm_win[i].v_offs),
 			CIF_ISP_AFM_RB_A + i * 8);
 	}
 

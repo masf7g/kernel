@@ -39,6 +39,8 @@
 #include <video/of_display_timing.h>
 #include <video/videomode.h>
 
+#define DBG(fmt, ...)  printk("%s-%d:" fmt, __FUNCTION__, __LINE__, ##__VA_ARGS__)
+
 struct cmd_ctrl_hdr {
 	u8 dtype;	/* data type */
 	u8 wait;	/* ms */
@@ -524,9 +526,19 @@ static int panel_simple_loader_protect(struct drm_panel *panel, bool on)
 static int panel_simple_disable(struct drm_panel *panel)
 {
 	struct panel_simple *p = to_panel_simple(panel);
+	int err = 0;
 
 	if (!p->enabled)
 		return 0;
+
+	if (p->off_cmds) {
+		if (p->dsi)
+			err = panel_simple_dsi_send_cmds(p, p->off_cmds);
+		else if (p->cmd_type == CMD_TYPE_SPI)
+			err = panel_simple_spi_send_cmds(p, p->off_cmds);
+		if (err)
+			dev_err(p->dev, "failed to send off cmds\n");
+	}
 
 	if (p->backlight) {
 		p->backlight->props.power = FB_BLANK_POWERDOWN;
@@ -544,19 +556,9 @@ static int panel_simple_disable(struct drm_panel *panel)
 static int panel_simple_unprepare(struct drm_panel *panel)
 {
 	struct panel_simple *p = to_panel_simple(panel);
-	int err = 0;
 
 	if (!p->prepared)
 		return 0;
-
-	if (p->off_cmds) {
-		if (p->dsi)
-			err = panel_simple_dsi_send_cmds(p, p->off_cmds);
-		else if (p->cmd_type == CMD_TYPE_SPI)
-			err = panel_simple_spi_send_cmds(p, p->off_cmds);
-		if (err)
-			dev_err(p->dev, "failed to send off cmds\n");
-	}
 
 	if (p->reset_gpio)
 		gpiod_direction_output(p->reset_gpio, 1);
@@ -606,15 +608,6 @@ static int panel_simple_prepare(struct drm_panel *panel)
 	if (p->desc && p->desc->delay.init)
 		msleep(p->desc->delay.init);
 
-	if (p->on_cmds) {
-		if (p->dsi)
-			err = panel_simple_dsi_send_cmds(p, p->on_cmds);
-		else if (p->cmd_type == CMD_TYPE_SPI)
-			err = panel_simple_spi_send_cmds(p, p->on_cmds);
-		if (err)
-			dev_err(p->dev, "failed to send on cmds\n");
-	}
-
 	p->prepared = true;
 
 	return 0;
@@ -623,9 +616,20 @@ static int panel_simple_prepare(struct drm_panel *panel)
 static int panel_simple_enable(struct drm_panel *panel)
 {
 	struct panel_simple *p = to_panel_simple(panel);
+	int err;
 
 	if (p->enabled)
 		return 0;
+
+	if (p->on_cmds) {
+		if (p->dsi) {
+			err = panel_simple_dsi_send_cmds(p, p->on_cmds);
+		}
+		else if (p->cmd_type == CMD_TYPE_SPI)
+			err = panel_simple_spi_send_cmds(p, p->on_cmds);
+		if (err)
+			dev_err(p->dev, "failed to send on cmds\n");
+	}
 
 	if (p->desc && p->desc->delay.enable)
 		msleep(p->desc->delay.enable);
@@ -2319,6 +2323,9 @@ static int panel_simple_dsi_probe(struct mipi_dsi_device *dsi)
 
 	if (!of_property_read_u32(dsi->dev.of_node, "dsi,lanes", &val))
 		dsi->lanes = val;
+
+	if (!of_property_read_u32(dsi->dev.of_node, "dsi,lvds-force-clk", &val))
+		dsi->lvds_force_clk = val;
 
 	return mipi_dsi_attach(dsi);
 }

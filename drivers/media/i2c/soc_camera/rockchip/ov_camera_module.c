@@ -966,6 +966,15 @@ long ov_camera_module_ioctl(struct v4l2_subdev *sd,
 		ov_camera_module_init(cam_mod, &cam_mod->custom);
 		pltfrm_camera_module_ioctl(sd, cmd, arg);
 		return ov_camera_module_attach(cam_mod);
+	} else if (cmd == PLTFRM_CIFCAM_VCM_INFO) {
+		struct v4l2_subdev *af_ctrl;
+
+		af_ctrl = pltfrm_camera_module_get_af_ctrl(sd);
+		if (!IS_ERR_OR_NULL(af_ctrl)) {
+			ret = v4l2_subdev_call(af_ctrl,
+			core, ioctl, PLTFRM_CIFCAM_VCM_INFO, arg);
+			return ret;
+		}
 	}
 
 	ret = pltfrm_camera_module_ioctl(sd, cmd, arg);
