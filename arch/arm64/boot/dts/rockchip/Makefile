@@ -51,6 +51,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-evb-rev3-android-edp.dtb
 dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-evb-rev3-android-lp4.dtb
 dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-evb-rev3-android-mipi-edp.dtb
 dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-evb-rev3-cros.dtb
+dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-firefly-aio-3399c-lvds.dtb
 dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-firefly-aio-3399c.dtb
 dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-firefly-aio-3399j-lvds.dtb
 dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-firefly-aio-3399j.dtb
