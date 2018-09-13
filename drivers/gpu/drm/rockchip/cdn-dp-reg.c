@@ -79,8 +79,8 @@ void cdn_dp_clock_reset(struct cdn_dp_device *dp)
 	      SOURCE_CRYPTO_SYS_CLK_EN;
 	writel(val, dp->regs + SOURCE_CRYPTO_CAR);
 
-	/* enable Mailbox and PIF interrupt */
-	writel(0, dp->regs + APB_INT_MASK);
+	val = ~(MAILBOX_INT_MASK_BIT | PIF_INT_MASK_BIT) & ALL_INT_MASK;
+	writel(val, dp->regs + APB_INT_MASK);
 }
 
 static int cdn_dp_mailbox_read(struct cdn_dp_device *dp)
@@ -189,7 +189,7 @@ static int cdn_dp_mailbox_send(struct cdn_dp_device *dp, u8 module_id,
 	return 0;
 }
 
-static int cdn_dp_reg_write(struct cdn_dp_device *dp, u16 addr, u32 val)
+int cdn_dp_reg_write(struct cdn_dp_device *dp, u16 addr, u32 val)
 {
 	u8 msg[6];
 
@@ -221,7 +221,12 @@ static int cdn_dp_reg_write_bit(struct cdn_dp_device *dp, u16 addr,
 				   sizeof(field), field);
 }
 
-int cdn_dp_dpcd_read(struct cdn_dp_device *dp, u32 addr, u8 *data, u16 len)
+/*
+ * Returns the number of bytes transferred on success, or a negative
+ * error code on failure. -ETIMEDOUT is returned if mailbox message was
+ * not send successfully;
+ */
+ssize_t cdn_dp_dpcd_read(struct cdn_dp_device *dp, u32 addr, u8 *data, u16 len)
 {
 	u8 msg[5], reg[5];
 	int ret;
@@ -247,24 +252,41 @@ int cdn_dp_dpcd_read(struct cdn_dp_device *dp, u32 addr, u8 *data, u16 len)
 		goto err_dpcd_read;
 
 	ret = cdn_dp_mailbox_read_receive(dp, data, len);
+	if (!ret)
+		return len;
 
 err_dpcd_read:
+	DRM_DEV_ERROR(dp->dev, "dpcd read failed: %d\n", ret);
 	return ret;
 }
 
-int cdn_dp_dpcd_write(struct cdn_dp_device *dp, u32 addr, u8 value)
+#define CDN_AUX_HEADER_SIZE	5
+#define CDN_AUX_MSG_SIZE	20
+/*
+ * Returns the number of bytes transferred on success, or a negative error
+ * code on failure. -ETIMEDOUT is returned if mailbox message was not send
+ * success; -EINVAL is returned if get the wrong data size after message
+ * is sent
+ */
+ssize_t cdn_dp_dpcd_write(struct cdn_dp_device *dp, u32 addr, u8 *data, u16 len)
 {
-	u8 msg[6], reg[5];
+	u8 msg[CDN_AUX_MSG_SIZE + CDN_AUX_HEADER_SIZE];
+	u8 reg[CDN_AUX_HEADER_SIZE];
 	int ret;
 
-	msg[0] = 0;
-	msg[1] = 1;
+	if (WARN_ON(len > CDN_AUX_MSG_SIZE) || WARN_ON(len <= 0))
+		return -EINVAL;
+
+	msg[0] = (len >> 8) & 0xff;
+	msg[1] = len & 0xff;
 	msg[2] = (addr >> 16) & 0xff;
 	msg[3] = (addr >> 8) & 0xff;
 	msg[4] = addr & 0xff;
-	msg[5] = value;
+
+	memcpy(msg + CDN_AUX_HEADER_SIZE, data, len);
+
 	ret = cdn_dp_mailbox_send(dp, MB_MODULE_ID_DP_TX, DPTX_WRITE_DPCD,
-				  sizeof(msg), msg);
+				  CDN_AUX_HEADER_SIZE + len, msg);
 	if (ret)
 		goto err_dpcd_write;
 
@@ -277,12 +299,43 @@ int cdn_dp_dpcd_write(struct cdn_dp_device *dp, u32 addr, u8 value)
 	if (ret)
 		goto err_dpcd_write;
 
-	if (addr != (reg[2] << 16 | reg[3] << 8 | reg[4]))
+	if ((len != (reg[0] << 8 | reg[1])) ||
+	    (addr != (reg[2] << 16 | reg[3] << 8 | reg[4]))) {
 		ret = -EINVAL;
+	} else {
+		return len;
+	}
 
 err_dpcd_write:
 	if (ret)
 		DRM_DEV_ERROR(dp->dev, "dpcd write failed: %d\n", ret);
+	return ret;
+}
+
+int cdn_dp_get_aux_status(struct cdn_dp_device *dp)
+{
+	u8 status;
+	int ret;
+
+	ret = cdn_dp_mailbox_send(dp, MB_MODULE_ID_DP_TX,
+				  DPTX_GET_LAST_AUX_STAUS, 0, NULL);
+	if (ret)
+		goto err_get_hpd;
+
+	ret = cdn_dp_mailbox_validate_receive(dp, MB_MODULE_ID_DP_TX,
+					      DPTX_GET_LAST_AUX_STAUS,
+					      sizeof(status));
+	if (ret)
+		goto err_get_hpd;
+
+	ret = cdn_dp_mailbox_read_receive(dp, &status, sizeof(status));
+	if (ret)
+		goto err_get_hpd;
+
+	return status;
+
+err_get_hpd:
+	DRM_DEV_ERROR(dp->dev, "get aux status failed: %d\n", ret);
 	return ret;
 }
 
@@ -546,6 +599,12 @@ static int cdn_dp_get_training_status(struct cdn_dp_device *dp)
 	dp->link.rate = status[0];
 	dp->link.num_lanes = status[1];
 
+    dev_info(dp->dev, "rate=%08x, lanes=%d\n", status[0], status[1]);
+    dev_info(dp->dev, "swing[0]=%d, preemphasis[0]=%d\n", status[2], status[3]);
+    dev_info(dp->dev, "swing[1]=%d, preemphasis[1]=%d\n", status[4], status[5]);
+    dev_info(dp->dev, "swing[2]=%d, preemphasis[2]=%d\n", status[6], status[7]);
+    dev_info(dp->dev, "swing[3]=%d, preemphasis[3]=%d\n", status[8], status[9]);
+
 err_get_training_status:
 	if (ret)
 		DRM_DEV_ERROR(dp->dev, "get training status failed: %d\n", ret);
@@ -556,6 +615,31 @@ int cdn_dp_train_link(struct cdn_dp_device *dp)
 {
 	int ret;
 
+	/*
+	 * DP firmware uses fixed phy config values to do training, but some
+	 * boards need to adjust these values to fit for their unique hardware
+	 * design. So if the phy is using custom config values, do software
+	 * link training instead of relying on firmware, if software training
+	 * fail, keep firmware training as a fallback if sw training fails.
+	 */
+	ret = cdn_dp_software_train_link(dp);
+	if (ret) {
+		DRM_DEV_ERROR(dp->dev,
+			      "Failed to do software training %d\n", ret);
+		goto do_fw_training;
+	}
+	ret = cdn_dp_reg_write(dp, SOURCE_HDTX_CAR, 0xf);
+	if (ret) {
+		DRM_DEV_ERROR(dp->dev,
+			      "Failed to write SOURCE_HDTX_CAR register %d\n", ret);
+		goto do_fw_training;
+	}
+	dp->use_fw_training = false;
+	return 0;
+
+do_fw_training:
+	dp->use_fw_training = true;
+	DRM_DEV_DEBUG_KMS(dp->dev, "use fw training\n");
 	ret = cdn_dp_training_start(dp);
 	if (ret) {
 		DRM_DEV_ERROR(dp->dev, "Failed to start training %d\n", ret);
@@ -570,7 +654,7 @@ int cdn_dp_train_link(struct cdn_dp_device *dp)
 
 	DRM_DEV_DEBUG_KMS(dp->dev, "rate:0x%x, lanes:%d\n", dp->link.rate,
 			  dp->link.num_lanes);
-	return ret;
+	return 0;
 }
 
 int cdn_dp_set_video_status(struct cdn_dp_device *dp, int active)
@@ -609,7 +693,7 @@ static int cdn_dp_get_msa_misc(struct video_info *video,
 	case YCBCR_4_2_0:
 		val[0] = 5;
 		break;
-	};
+	}
 
 	switch (video->color_depth) {
 	case 6:
@@ -627,7 +711,7 @@ static int cdn_dp_get_msa_misc(struct video_info *video,
 	case 16:
 		val[1] = 4;
 		break;
-	};
+	}
 
 	msa_misc = 2 * val[0] + 32 * val[1] +
 		   ((video->color_fmt == Y_ONLY) ? (1 << 14) : 0);
@@ -671,6 +755,10 @@ int cdn_dp_config_video(struct cdn_dp_device *dp)
 		rem = do_div(symbol, 1000);
 		if (tu_size_reg > 64) {
 			ret = -EINVAL;
+			DRM_DEV_ERROR(dp->dev,
+				      "tu error, clk:%d, lanes:%d, rate:%d\n",
+				      mode->clock, dp->link.num_lanes,
+				      link_rate);
 			goto err_config_video;
 		}
 	} while ((symbol <= 1) || (tu_size_reg - symbol < 4) ||
@@ -705,7 +793,7 @@ int cdn_dp_config_video(struct cdn_dp_device *dp)
 	case 16:
 		val = BCS_16;
 		break;
-	};
+	}
 
 	val += video->color_fmt << 8;
 	ret = cdn_dp_reg_write(dp, DP_FRAMER_PXL_REPR, val);
