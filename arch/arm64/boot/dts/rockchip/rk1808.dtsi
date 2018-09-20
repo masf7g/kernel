@@ -90,7 +90,7 @@
 		#clock-cells = <0>;
 	};
 
-	usbdrd3: usb@fd000000 {
+	usbdrd3: usb {
 		compatible = "rockchip,rk1808-dwc3";
 		clocks = <&cru SCLK_USB3_OTG0_REF>, <&cru ACLK_USB3OTG>,
 			 <&cru SCLK_USB3_OTG0_SUSPEND>;
@@ -479,21 +479,14 @@
 		status = "disabled";
 	};
 
-	amba {
-		compatible = "simple-bus";
-		#address-cells = <2>;
-		#size-cells = <2>;
-		ranges;
-
-		dmac: dmac@ff4e0000 {
-			compatible = "arm,pl330", "arm,primecell";
-			reg = <0x0 0xff4e0000 0x0 0x4000>;
-			interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
-			//clocks = <&cru ACLK_DMAC>;
-			//clock-names = "apb_pclk";
-			#dma-cells = <1>;
-			peripherals-req-type-burst;
-		};
+	dmac: dmac@ff4e0000 {
+		compatible = "arm,pl330", "arm,primecell";
+		reg = <0x0 0xff4e0000 0x0 0x4000>;
+		interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&cru ACLK_DMAC>;
+		clock-names = "apb_pclk";
+		#dma-cells = <1>;
+		peripherals-req-type-burst;
 	};
 
 	uart0: serial@ff430000 {
@@ -911,6 +904,15 @@
 		interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&sdmmc1_clk &sdmmc1_cmd &sdmmc1_bus4>;
+		status = "disabled";
+	};
+
+	npu: npu@ffbc0000 {
+		compatible = "rockchip,npu";
+		reg = <0x0 0xffbc0000 0x0 0x1000>;
+		clocks =  <&cru SCLK_NPU>, <&cru HCLK_NPU>;
+		clock-names = "sclk_npu", "hclk_npu";
+		interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
 		status = "disabled";
 	};
 
