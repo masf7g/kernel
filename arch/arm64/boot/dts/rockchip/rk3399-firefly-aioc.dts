@@ -92,9 +92,10 @@
 };
 
 &rt5640 {
-	/delete-property/ io-channels;
 	hp-con-gpio = <&gpio1 22 GPIO_ACTIVE_HIGH>;
 	hp-det-gpio = <&gpio2 2 GPIO_ACTIVE_HIGH>;
+	io-channels = <0>;
+	linein-mute = <1>;
 };
 
 &sdmmc {
