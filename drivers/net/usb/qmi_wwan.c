@@ -120,15 +120,15 @@ struct sk_buff *qmi_wwan_tx_fixup(struct usbnet *dev, struct sk_buff *skb, gfp_t
 {
 	if (dev->udev->descriptor.idVendor != cpu_to_le16(0x2C7C))
 		return skb;
-		/* Skip Ethernet header from message */
-		if (skb_pull(skb, ETH_HLEN)) {
-			return skb;
-		} else {
-			dev_err(&dev->intf->dev, "Packet Dropped");
-		}
-		/* Filter the packet out, release it */
-		dev_kfree_skb_any(skb);
-		return NULL;
+	/* Skip Ethernet header from message */
+	if (skb_pull(skb, ETH_HLEN)) {
+		return skb;
+	} else {
+		dev_err(&dev->intf->dev, "Packet Dropped");
+	}
+	/* Filter the packet out, release it */
+	dev_kfree_skb_any(skb);
+	return NULL;
 }
 #endif
 

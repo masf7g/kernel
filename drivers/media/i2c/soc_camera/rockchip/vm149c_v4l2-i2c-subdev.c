@@ -223,12 +223,12 @@ static int vm149c_s_ctrl(
 	    if (nPosition > MAX_VCMDRV_REG)
 	        nPosition = MAX_VCMDRV_REG;
 
-		dev->current_lens_pos = nPosition;
-		msb = (0x00U | ((dev->current_lens_pos & 0x3F0U) >> 4U));
-		lsb = (((dev->current_lens_pos & 0x0FU) << 4U) | 0x04);
-		ret = vm149c_write_msg(client, msb, lsb);
-		if (IS_ERR_VALUE(ret))
-			goto err;
+	    dev->current_lens_pos = nPosition;
+	    msb = (0x00U | ((dev->current_lens_pos & 0x3F0U) >> 4U));
+	    lsb = (((dev->current_lens_pos & 0x0FU) << 4U) | 0x04);
+	    ret = vm149c_write_msg(client, msb, lsb);
+	    if (IS_ERR_VALUE(ret))
+		goto err;
 	} else {
 		dev_info(&client->dev,
 			"ctrl ID %d not supported\n", ctrl->id);
