@@ -228,13 +228,12 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&pmic_vsel>, <&pwr_hold>;
 		system-power-controller;
-		status = "okay";
 
 		vp1-supply = <&vcc_sys>;
 		vp2-supply = <&vcc_sys>;
 		vp3-supply = <&vcc_sys>;
 		vp4-supply = <&vcc_sys>;
-		inl1-supply = <&vcc_io>;
+		inl1-supply = <&vcc_sys>;
 		inl2-supply = <&vcc_sys>;
 		inl3-supply = <&vcc_20>;
 
@@ -281,26 +280,26 @@
 				regulator-always-on;
 			};
 
-			vcca_18: REG7 {
-				regulator-name = "vcca_18";
-				regulator-min-microvolt = <1800000>;
-				regulator-max-microvolt = <1800000>;
-				regulator-always-on;
-			};
-
-			vcca_33: REG8 {
+			vcca_33: REG7 {
 				regulator-name = "vcca_33";
 				regulator-min-microvolt = <3300000>;
 				regulator-max-microvolt = <3300000>;
 				regulator-always-on;
 			};
 
-			vcc_lan: REG9 {
+			vcc_lan: REG8 {
 				regulator-name = "vcc_lan";
 				regulator-min-microvolt = <3300000>;
 				regulator-max-microvolt = <3300000>;
 				regulator-always-on;
 				regulator-boot-on;
+			};
+
+			vcc_pmu: REG9 {
+				regulator-name = "vcc_pmu";
+				regulator-min-microvolt = <3300000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-always-on;
 			};
 
 			vdd_10: REG10 {
