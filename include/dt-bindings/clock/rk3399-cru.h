@@ -153,6 +153,7 @@
 #define DCLK_M0_PERILP			184
 #define DCLK_VOP0_FRAC			185
 #define DCLK_VOP1_FRAC			186
+#define SCLK_I2S_8CH			187
 
 #define FCLK_CM0S 			190
 
