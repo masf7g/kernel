@@ -41,7 +41,7 @@
  */
 
 /dts-v1/;
-#include "rk3288-firefly.dtsi"
+#include "rk3288-firefly-port.dtsi"
 
 / {
 	model = "Firefly-RK3288 Board (Linux Opensource)";

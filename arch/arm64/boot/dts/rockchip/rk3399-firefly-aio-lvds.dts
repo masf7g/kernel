@@ -237,9 +237,9 @@
 		touch-gpio = <&gpio4 27 IRQ_TYPE_LEVEL_LOW>;
 		reset-gpio = <&gpio0 12 GPIO_ACTIVE_HIGH>;
 		gsl,fw = <1>;
-		swap-xy = <0>;
 		flip-x = <1>;
 		flip-y = <0>;
+		swap-xy = <0>;
 	};
 
 	sensor@4c {
