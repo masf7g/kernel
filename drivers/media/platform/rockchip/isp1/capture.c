@@ -809,7 +809,6 @@ static int mp_config_mi(struct rkisp1_stream *stream)
 			 stream->out_fmt.height);
 	mi_set_cb_size(stream, stream->out_fmt.plane_fmt[1].sizeimage);
 	mi_set_cr_size(stream, stream->out_fmt.plane_fmt[2].sizeimage);
-
 	mi_frame_end_int_enable(stream);
 	if (stream->out_isp_fmt.uv_swap)
 		mp_set_uv_swap(base);

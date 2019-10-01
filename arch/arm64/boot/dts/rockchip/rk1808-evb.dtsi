@@ -48,6 +48,7 @@
 			240 241 242 243 244 245 246 247
 			248 249 250 251 252 253 254 255>;
 		default-brightness-level = <200>;
+		enable-gpios = <&gpio0 RK_PC4 GPIO_ACTIVE_HIGH>;
 	};
 
 	display_subsystem: display-subsystem {
@@ -108,6 +109,19 @@
 			compatible = "rockchip,drm-logo";
 			reg = <0x0 0x0 0x0 0x0>;
 		};
+
+		ramoops_mem: region@110000 {
+			reg = <0x0 0x110000 0x0 0xf0000>;
+		};
+	};
+
+	ramoops: ramoops {
+		compatible = "ramoops";
+		record-size = <0x0 0x30000>;
+		console-size = <0x0 0xc0000>;
+		ftrace-size = <0x0 0x00000>;
+		pmsg-size = <0x0 0x00000>;
+		memory-region = <&ramoops_mem>;
 	};
 
 	sdio_pwrseq: sdio-pwrseq {
@@ -495,6 +509,17 @@
 
 &pwm1 {
 	status = "okay";
+};
+
+&sdio {
+	bus-width = <4>;
+	cap-mmc-highspeed;
+	cap-sd-highspeed;
+	supports-sdio;
+	sd-uhs-sdr25;
+	sd-uhs-sdr50;
+	sd-uhs-sdr104;
+	status = "disabled";
 };
 
 &sdmmc {
