@@ -21,7 +21,7 @@ config VIDEO_IR_I2C
 # Encoder / Decoder module configuration
 #
 
-menu "Encoders, decoders, sensors and other helper chips"
+menu "I2C Encoders, decoders, sensors and other helper chips"
 	visible if !MEDIA_SUBDRV_AUTOSELECT || COMPILE_TEST
 
 comment "Audio decoders, processors and mixers"
@@ -501,6 +501,23 @@ config VIDEO_IMX219
 	---help---
 	  This driver supports IMX219 cameras from Sony
 
+config VIDEO_IMX323
+	tristate "Sony imx323 sensor support"
+	depends on VIDEO_V4L2 && I2C
+	depends on MEDIA_CAMERA_SUPPORT
+	select V4L2_FWNODE
+	help
+	  This driver supports IMX323 cameras from Sony
+
+config VIDEO_VIRT_CAMERA
+	tristate "Rockchip virtual sensor support"
+	depends on VIDEO_V4L2 && I2C
+	depends on MEDIA_CAMERA_SUPPORT
+	select V4L2_FWNODE
+	help
+	  This is a Video4Linux2 sensor-level driver for the Rockchip
+	  virtual camera.
+
 config VIDEO_OV2659
 	tristate "OmniVision OV2659 sensor support"
 	depends on VIDEO_V4L2 && I2C
@@ -524,6 +541,29 @@ config VIDEO_OV2685
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called ov2685.
+
+config VIDEO_OV2718
+	tristate "OmniVision OV2718 sensor support"
+	depends on VIDEO_V4L2 && I2C && MEDIA_CONTROLLER
+	depends on MEDIA_CAMERA_SUPPORT
+	select V4L2_FWNODE
+	help
+	  This is a Video4Linux2 sensor-level driver for the OmniVision
+	  OV2718 camera.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ov2718.
+
+config VIDEO_OV2735
+	tristate "OmniVision OV2735 sensor support"
+	depends on VIDEO_V4L2 && I2C
+	depends on MEDIA_CAMERA_SUPPORT
+	help
+	 This is a Video4Linux2 sensor-level driver for the OmniVision
+	 OV2735 camera.
+
+	 To compile this driver as a module, choose M here: the
+	 module will be called ov2735.
 
 config VIDEO_OV4689
 	tristate "OmniVision OV4689 sensor support"
@@ -560,6 +600,17 @@ config VIDEO_OV5695
 	  To compile this driver as a module, choose M here: the
 	  module will be called ov5695.
 
+config VIDEO_OV7251
+	tristate "OmniVision OV7251 sensor support"
+	depends on I2C && VIDEO_V4L2
+	depends on MEDIA_CAMERA_SUPPORT
+	help
+	  This is a Video4Linux2 sensor-level driver for the OmniVision
+	  OV7251 camera.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ov7251.
+
 config VIDEO_OV7640
 	tristate "OmniVision OV7640 sensor support"
 	depends on I2C && VIDEO_V4L2
@@ -579,6 +630,28 @@ config VIDEO_OV7670
 	  This is a Video4Linux2 sensor-level driver for the OmniVision
 	  OV7670 VGA camera.  It currently only works with the M88ALP01
 	  controller.
+
+config VIDEO_OV7725
+	tristate "OmniVision OV7725 sensor support"
+	depends on I2C && VIDEO_V4L2
+	depends on MEDIA_CAMERA_SUPPORT
+	help
+	  This is a Video4Linux2 sensor-level driver for the OmniVision
+	  OV7725 camera.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ov7725.
+
+config VIDEO_OV7750
+	tristate "OmniVision OV7750 sensor support"
+	depends on I2C && VIDEO_V4L2
+	depends on MEDIA_CAMERA_SUPPORT
+	help
+	  This is a Video4Linux2 sensor-level driver for the OmniVision
+	  OV7750 camera.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ov7750.
 
 config VIDEO_OV9650
 	tristate "OmniVision OV9650/OV9652 sensor support"
@@ -739,6 +812,26 @@ config VIDEO_GC2145
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called gc2145.
+
+config VIDEO_GC2355
+	tristate "GalaxyCore GC2355 sensor support"
+	depends on VIDEO_V4L2 && I2C && VIDEO_V4L2_SUBDEV_API
+	default y
+	help
+	  Support for the GalaxyCore GC2355 sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called gc2355.
+
+config VIDEO_SC031GS
+	tristate "GalaxyCore SC031GS sensor support"
+	depends on VIDEO_V4L2 && I2C && VIDEO_V4L2_SUBDEV_API
+	default y
+	help
+	  Support for the Smartsens SC031GS sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called sc031gs.
 
 config VIDEO_GC0329
 	tristate "GalaxyCore GC0329 sensor support"

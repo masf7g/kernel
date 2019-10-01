@@ -36,6 +36,13 @@
 #define _RKISP1_REGS_H
 #include "dev.h"
 
+/* GRF */
+#define GRF_VI_CON0 				0x430
+#define ISP_CIF_DATA_WIDTH_MASK 		0x60006000
+#define ISP_CIF_DATA_WIDTH_8B			(0 << 13 | 3 << 29)
+#define ISP_CIF_DATA_WIDTH_10B			(BIT(13) | 3 << 29)
+#define ISP_CIF_DATA_WIDTH_12B			(2 << 13 | 3 << 29)
+
 /* ISP_CTRL */
 #define CIF_ISP_CTRL_ISP_ENABLE			BIT(0)
 #define CIF_ISP_CTRL_ISP_MODE_RAW_PICT		(0 << 1)
@@ -182,6 +189,11 @@
 #define CIF_MI_CTRL_SHD_SP_OUT_ENABLED		BIT(17)
 #define CIF_MI_CTRL_SHD_JPEG_OUT_ENABLED	BIT(18)
 #define CIF_MI_CTRL_SHD_RAW_OUT_ENABLED		BIT(19)
+
+/* MI_CTRL2 */
+#define CIF_MI_CTRL2_MIPI_RAW0_PINGPONG_EN	BIT(2)
+#define CIF_MI_CTRL2_MIPI_RAW0_AUTO_UPDATE	BIT(1)
+#define CIF_MI_CTRL2_MIPI_RAW0_ENABLE		BIT(0)
 
 /* RSZ_CTRL */
 #define CIF_RSZ_CTRL_SCALE_HY_ENABLE		BIT(0)
@@ -352,6 +364,7 @@
 
 /* MIPI_CTRL */
 #define CIF_MIPI_CTRL_OUTPUT_ENA		BIT(0)
+#define CIF_MIPI_CTRL_FLUSH_FIFO		BIT(1)
 #define CIF_MIPI_CTRL_SHUTDOWNLANES(a)		(((a) & 0xF) << 8)
 #define CIF_MIPI_CTRL_NUM_LANES(a)		(((a) & 0x3) << 12)
 #define CIF_MIPI_CTRL_ERR_SOT_HS_SKIP		BIT(16)
@@ -716,6 +729,17 @@
 #define CIF_ISP_DPF_SPATIAL_COEFF_MAX		0x1F
 #define CIF_ISP_DPF_NLL_COEFF_N_MAX		0x3FF
 
+/* CSI0 */
+#define CIF_ISP_CSI0_IMASK_LINECNT		BIT(12)
+#define CIF_ISP_CSI0_IMASK_RAW1_OUT_V_END	BIT(11)
+#define CIF_ISP_CSI0_IMASK_RAW0_OUT_V_END	BIT(10)
+#define CIF_ISP_CSI0_IMASK_FRAME_END(a)		(((a) & 0x3F) << 0)
+
+#define CIF_ISP_CSI0_DMATX0_VC(a)		(((a) & 0xFF) << 8)
+#define CIF_ISP_CSI0_DMATX0_SIMG_SWP		BIT(2)
+#define CIF_ISP_CSI0_DMATX0_SIMG_MODE		BIT(1)
+#define CIF_ISP_CSI0_DMATX0_EN			BIT(0)
+
 /* =================================================================== */
 /*                            CIF Registers                            */
 /* =================================================================== */
@@ -1065,6 +1089,18 @@
 #define CIF_MI_SP_CB_BASE_AD_INIT2	(CIF_MI_BASE + 0x00000140)
 #define CIF_MI_SP_CR_BASE_AD_INIT2	(CIF_MI_BASE + 0x00000144)
 #define CIF_MI_XTD_FORMAT_CTRL		(CIF_MI_BASE + 0x00000148)
+#define CIF_MI_CTRL2			(CIF_MI_BASE + 0x00000150)
+#define CIF_MI_RAW0_BASE_AD_INIT	(CIF_MI_BASE + 0x00000160)
+#define CIF_MI_RAW0_BASE_AD_INIT2	(CIF_MI_BASE + 0x00000164)
+#define CIF_MI_RAW0_IRQ_OFFS_INIT	(CIF_MI_BASE + 0x00000168)
+#define CIF_MI_RAW0_SIZE_INIT		(CIF_MI_BASE + 0x0000016c)
+#define CIF_MI_RAW0_OFFS_CNT_INIT	(CIF_MI_BASE + 0x00000170)
+#define CIF_MI_RAW0_LENGTH		(CIF_MI_BASE + 0x00000174)
+#define CIF_MI_RAW0_OFFS_CNT_START_SHD	(CIF_MI_BASE + 0x00000178)
+#define CIF_MI_RAW0_BASE_AS_SHD		(CIF_MI_BASE + 0x00000180)
+#define CIF_MI_RAW0_IRQ_OFFS_INI_SHD	(CIF_MI_BASE + 0x00000184)
+#define CIF_MI_RAW0_SIZE_INIT_SHD	(CIF_MI_BASE + 0x00000188)
+#define CIF_MI_RAW0_OFFS_CNT_INIT_SHD	(CIF_MI_BASE + 0x0000018c)
 
 #define CIF_SMIA_BASE			0x00001A00
 #define CIF_SMIA_CTRL			(CIF_SMIA_BASE + 0x00000000)
@@ -1437,6 +1473,28 @@
 
 #define CIF_ISP_CSI0_BASE		0x00007000
 #define CIF_ISP_CSI0_CTRL0		(CIF_ISP_CSI0_BASE + 0x00000000)
+#define CIF_ISP_CSI0_CTRL1		(CIF_ISP_CSI0_BASE + 0x00000004)
+#define CIF_ISP_CSI0_CTRL2		(CIF_ISP_CSI0_BASE + 0x00000008)
+#define CIF_ISP_CSI0_CSI2_RESETN	(CIF_ISP_CSI0_BASE + 0x00000010)
+#define CIF_ISP_CSI0_PHY_STATE_RO	(CIF_ISP_CSI0_BASE + 0x00000014)
+#define CIF_ISP_CSI0_DATA_IDS_1		(CIF_ISP_CSI0_BASE + 0x00000018)
+#define CIF_ISP_CSI0_DATA_IDS_2		(CIF_ISP_CSI0_BASE + 0x0000001c)
+#define CIF_ISP_CSI0_ERR1		(CIF_ISP_CSI0_BASE + 0x00000020)
+#define CIF_ISP_CSI0_ERR2		(CIF_ISP_CSI0_BASE + 0x00000024)
+#define CIF_ISP_CSI0_ERR3		(CIF_ISP_CSI0_BASE + 0x00000028)
+#define CIF_ISP_CSI0_MASK1		(CIF_ISP_CSI0_BASE + 0x0000002c)
+#define CIF_ISP_CSI0_MASK2		(CIF_ISP_CSI0_BASE + 0x00000030)
+#define CIF_ISP_CSI0_MASK3		(CIF_ISP_CSI0_BASE + 0x00000034)
+#define CIF_ISP_CSI0_SET_HEARDER	(CIF_ISP_CSI0_BASE + 0x00000038)
+#define CIF_ISP_CSI0_CUR_HEADER_RO	(CIF_ISP_CSI0_BASE + 0x0000003c)
+#define CIF_ISP_CSI0_DMATX0_CTRL	(CIF_ISP_CSI0_BASE + 0x00000040)
+#define CIF_ISP_CSI0_DMATX0_LINECNT_RO	(CIF_ISP_CSI0_BASE + 0x00000044)
+#define CIF_ISP_CSI0_DMATX0_PIC_SIZE	(CIF_ISP_CSI0_BASE + 0x00000048)
+#define CIF_ISP_CSI0_DMATX0_PIC_OFF	(CIF_ISP_CSI0_BASE + 0x0000004c)
+#define CIF_ISP_CSI0_FRAME_NUM_RO	(CIF_ISP_CSI0_BASE + 0x00000070)
+#define CIF_ISP_CSI0_ISP_LINECNT_RO	(CIF_ISP_CSI0_BASE + 0x00000074)
+#define CIF_ISP_CSI0_TX_IBUF_STATUS_RO	(CIF_ISP_CSI0_BASE + 0x00000078)
+#define CIF_ISP_CSI0_VERSION		(CIF_ISP_CSI0_BASE + 0x0000007c)
 
 void disable_dcrop(struct rkisp1_stream *stream, bool async);
 void config_dcrop(struct rkisp1_stream *stream, struct v4l2_rect *rect,
@@ -1696,6 +1754,81 @@ static inline void sp_mi_ctrl_autoupdate_en(void __iomem *base)
 static inline void force_cfg_update(void __iomem *base)
 {
 	writel(CIF_MI_INIT_SOFT_UPD, base + CIF_MI_INIT);
+}
+
+static inline void dmatx0_ctrl(void __iomem *base, u32 val)
+{
+	writel(val, base + CIF_ISP_CSI0_DMATX0_CTRL);
+}
+
+static inline void dmatx0_enable(void __iomem *base)
+{
+	void __iomem *addr = base + CIF_ISP_CSI0_DMATX0_CTRL;
+
+	writel(CIF_ISP_CSI0_DMATX0_EN | readl(addr), addr);
+}
+
+static inline void dmatx0_disable(void __iomem *base)
+{
+	void __iomem *addr = base + CIF_ISP_CSI0_DMATX0_CTRL;
+
+	writel(~CIF_ISP_CSI0_DMATX0_EN & readl(addr), addr);
+}
+
+static inline void dmatx0_set_pic_size(void __iomem *base,
+					u32 width, u32 height)
+{
+	writel(height << 16 | width,
+		base + CIF_ISP_CSI0_DMATX0_PIC_SIZE);
+}
+
+static inline void dmatx0_set_pic_off(void __iomem *base, u32 val)
+{
+	writel(val, base + CIF_ISP_CSI0_DMATX0_PIC_OFF);
+}
+
+static inline void mi_raw0_set_size(void __iomem *base, u32 val)
+{
+	writel(val, base + CIF_MI_RAW0_SIZE_INIT);
+}
+
+static inline void mi_raw0_set_offs(void __iomem *base, u32 val)
+{
+	writel(val, base + CIF_MI_RAW0_OFFS_CNT_INIT);
+}
+
+static inline void mi_raw0_set_length(void __iomem *base, u32 val)
+{
+	writel(val, base + CIF_MI_RAW0_LENGTH);
+}
+
+static inline void mi_raw0_set_irq_offs(void __iomem *base, u32 val)
+{
+	writel(val, base + CIF_MI_RAW0_IRQ_OFFS_INIT);
+}
+
+static inline void mi_raw0_set_addr(void __iomem *base, u32 val)
+{
+	writel(val, base + CIF_MI_RAW0_BASE_AD_INIT);
+}
+
+static inline void mi_mipi_raw0_enable(void __iomem *base)
+{
+	void __iomem *addr = base + CIF_MI_CTRL2;
+
+	writel(CIF_MI_CTRL2_MIPI_RAW0_ENABLE | readl(addr), addr);
+}
+
+static inline void mi_mipi_raw0_disable(void __iomem *base)
+{
+	void __iomem *addr = base + CIF_MI_CTRL2;
+
+	writel(~CIF_MI_CTRL2_MIPI_RAW0_ENABLE & readl(addr), addr);
+}
+
+static inline void mi_ctrl2(void __iomem *base, u32 val)
+{
+	writel(val, base + CIF_MI_CTRL2);
 }
 
 #endif /* _RKISP1_REGS_H */

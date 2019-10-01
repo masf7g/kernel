@@ -36,6 +36,7 @@
 #include <media/v4l2-ioctl.h>
 #include <media/videobuf2-core.h>
 #include <media/videobuf2-vmalloc.h>	/* for ISP params */
+#include <linux/rk-preisp.h>
 #include "dev.h"
 #include "regs.h"
 
@@ -1292,6 +1293,12 @@ void __isp_isr_other_config(struct rkisp1_isp_params_vdev *params_vdev,
 {
 	unsigned int module_en_update, module_cfg_update, module_ens;
 	struct rkisp1_isp_params_ops *ops = params_vdev->ops;
+	struct ispsd_in_fmt *in_fmt = &params_vdev->dev->isp_sdev.in_fmt;
+	bool is_grey_sensor;
+
+	is_grey_sensor = in_fmt->mbus_code == MEDIA_BUS_FMT_Y8_1X8 ||
+			 in_fmt->mbus_code == MEDIA_BUS_FMT_Y10_1X10 ||
+			 in_fmt->mbus_code == MEDIA_BUS_FMT_Y12_1X12;
 
 	module_en_update = new_params->module_en_update;
 	module_cfg_update = new_params->module_cfg_update;
@@ -1389,8 +1396,9 @@ void __isp_isr_other_config(struct rkisp1_isp_params_vdev *params_vdev,
 		}
 	}
 
-	if ((module_en_update & CIFISP_MODULE_BDM) ||
-	    (module_cfg_update & CIFISP_MODULE_BDM)) {
+	if (((module_en_update & CIFISP_MODULE_BDM) ||
+	    (module_cfg_update & CIFISP_MODULE_BDM)) &&
+	    !is_grey_sensor) {
 		/* update bdm config */
 		if ((module_cfg_update & CIFISP_MODULE_BDM))
 			ops->bdm_config(params_vdev, &new_params->others.bdm_config);
@@ -1586,6 +1594,66 @@ void __isp_isr_meas_config(struct rkisp1_isp_params_vdev *params_vdev,
 	}
 }
 
+static __maybe_unused
+void __preisp_isr_update_hdrae_para(struct rkisp1_isp_params_vdev *params_vdev,
+				    struct rkisp1_isp_params_cfg *new_params)
+{
+	struct preisp_hdrae_para_s *hdrae;
+	struct cifisp_lsc_config *lsc;
+	struct cifisp_awb_gain_config *awb_gain;
+	unsigned int module_en_update, module_cfg_update, module_ens;
+	int i, ret;
+
+	hdrae = &params_vdev->hdrae_para;
+	module_en_update = new_params->module_en_update;
+	module_cfg_update = new_params->module_cfg_update;
+	module_ens = new_params->module_ens;
+	lsc = &new_params->others.lsc_config;
+	awb_gain = &new_params->others.awb_gain_config;
+
+	if (!params_vdev->dev->hdr_sensor)
+		return;
+
+	if ((module_en_update & CIFISP_MODULE_AWB_GAIN) ||
+	    (module_cfg_update & CIFISP_MODULE_AWB_GAIN)) {
+		/* update awb gains */
+		if ((module_cfg_update & CIFISP_MODULE_AWB_GAIN)) {
+			hdrae->r_gain = awb_gain->gain_red;
+			hdrae->b_gain = awb_gain->gain_blue;
+			hdrae->gr_gain = awb_gain->gain_green_r;
+			hdrae->gb_gain = awb_gain->gain_green_b;
+		}
+
+		if (module_en_update & CIFISP_MODULE_AWB_GAIN) {
+			if (!(module_ens & CIFISP_MODULE_AWB_GAIN)) {
+				hdrae->r_gain = 0x0100;
+				hdrae->b_gain = 0x0100;
+				hdrae->gr_gain = 0x0100;
+				hdrae->gb_gain = 0x0100;
+			}
+		}
+	}
+
+	if ((module_en_update & CIFISP_MODULE_LSC) ||
+	    (module_cfg_update & CIFISP_MODULE_LSC)) {
+		/* update lsc config */
+		if ((module_cfg_update & CIFISP_MODULE_LSC))
+			memcpy(hdrae->lsc_table, lsc->gr_data_tbl,
+				PREISP_LSCTBL_SIZE);
+
+		if (module_en_update & CIFISP_MODULE_LSC) {
+			if (!(module_ens & CIFISP_MODULE_LSC))
+				for (i = 0; i < PREISP_LSCTBL_SIZE; i++)
+					hdrae->lsc_table[i] = 0x0400;
+		}
+	}
+
+	ret = v4l2_subdev_call(params_vdev->dev->hdr_sensor, core, ioctl,
+			       PREISP_CMD_SAVE_HDRAE_PARAM, hdrae);
+	if (ret)
+		params_vdev->dev->hdr_sensor = NULL;
+}
+
 void rkisp1_params_isr(struct rkisp1_isp_params_vdev *params_vdev, u32 isp_mis)
 {
 	struct rkisp1_isp_params_cfg *new_params;
@@ -1603,15 +1671,17 @@ void rkisp1_params_isr(struct rkisp1_isp_params_vdev *params_vdev, u32 isp_mis)
 	if (!list_empty(&params_vdev->params))
 		cur_buf = list_first_entry(&params_vdev->params,
 					   struct rkisp1_buffer, queue);
-	spin_unlock(&params_vdev->config_lock);
-
-	if (!cur_buf)
+	if (!cur_buf) {
+		spin_unlock(&params_vdev->config_lock);
 		return;
+	}
 
 	new_params = (struct rkisp1_isp_params_cfg *)(cur_buf->vaddr[0]);
 
 	if (isp_mis & CIF_ISP_FRAME) {
 		u32 isp_ctrl;
+
+		list_del(&cur_buf->queue);
 
 		__isp_isr_other_config(params_vdev, new_params);
 		__isp_isr_meas_config(params_vdev, new_params);
@@ -1621,13 +1691,12 @@ void rkisp1_params_isr(struct rkisp1_isp_params_vdev *params_vdev, u32 isp_mis)
 		isp_ctrl |= CIF_ISP_CTRL_ISP_CFG_UPD;
 		rkisp1_iowrite32(params_vdev, isp_ctrl, CIF_ISP_CTRL);
 
-		spin_lock(&params_vdev->config_lock);
-		list_del(&cur_buf->queue);
-		spin_unlock(&params_vdev->config_lock);
+		__preisp_isr_update_hdrae_para(params_vdev, new_params);
 
 		cur_buf->vb.sequence = cur_frame_id;
 		vb2_buffer_done(&cur_buf->vb.vb2_buf, VB2_BUF_STATE_DONE);
 	}
+	spin_unlock(&params_vdev->config_lock);
 }
 
 static const struct cifisp_awb_meas_config awb_params_default_config = {
@@ -1674,6 +1743,7 @@ void rkisp1_params_config_parameter(struct rkisp1_isp_params_vdev *params_vdev)
 {
 	struct rkisp1_isp_params_ops *ops = params_vdev->ops;
 	struct cifisp_hst_config hst = hst_params_default_config;
+	int i;
 
 	spin_lock(&params_vdev->config_lock);
 
@@ -1688,7 +1758,8 @@ void rkisp1_params_config_parameter(struct rkisp1_isp_params_vdev *params_vdev)
 
 	memset(hst.hist_weight, 0x01, sizeof(hst.hist_weight));
 	ops->hst_config(params_vdev, &hst);
-	if (params_vdev->dev->isp_ver == ISP_V12) {
+	if (params_vdev->dev->isp_ver == ISP_V12 ||
+	    params_vdev->dev->isp_ver == ISP_V13) {
 		isp_param_set_bits(params_vdev, CIF_ISP_HIST_CTRL_V12,
 			   ~CIF_ISP_HIST_CTRL_MODE_MASK_V12 |
 			   hst_params_default_config.mode);
@@ -1704,9 +1775,30 @@ void rkisp1_params_config_parameter(struct rkisp1_isp_params_vdev *params_vdev)
 	else
 		ops->csm_config(params_vdev, false);
 
+	/* disable color related config for grey sensor */
+	if (params_vdev->in_mbus_code == MEDIA_BUS_FMT_Y8_1X8 ||
+	    params_vdev->in_mbus_code == MEDIA_BUS_FMT_Y10_1X10 ||
+	    params_vdev->in_mbus_code == MEDIA_BUS_FMT_Y12_1X12) {
+		ops->ctk_enable(params_vdev, false);
+		isp_param_clear_bits(params_vdev,
+				     CIF_ISP_CTRL,
+				     CIF_ISP_CTRL_ISP_AWB_ENA);
+		isp_param_clear_bits(params_vdev,
+				     CIF_ISP_LSC_CTRL,
+				     CIF_ISP_LSC_CTRL_ENA);
+	}
+
+	params_vdev->hdrae_para.r_gain = 0x0100;
+	params_vdev->hdrae_para.b_gain = 0x0100;
+	params_vdev->hdrae_para.gr_gain = 0x0100;
+	params_vdev->hdrae_para.gb_gain = 0x0100;
+	for (i = 0; i < PREISP_LSCTBL_SIZE; i++)
+		params_vdev->hdrae_para.lsc_table[i] = 0x0400;
+
 	/* override the default things */
 	__isp_isr_other_config(params_vdev, &params_vdev->cur_params);
 	__isp_isr_meas_config(params_vdev, &params_vdev->cur_params);
+	__preisp_isr_update_hdrae_para(params_vdev, &params_vdev->cur_params);
 
 	spin_unlock(&params_vdev->config_lock);
 }
@@ -1718,6 +1810,7 @@ void rkisp1_params_configure_isp(struct rkisp1_isp_params_vdev *params_vdev,
 {
 	params_vdev->quantization = quantization;
 	params_vdev->raw_type = in_fmt->bayer_pat;
+	params_vdev->in_mbus_code = in_fmt->mbus_code;
 	rkisp1_params_config_parameter(params_vdev);
 }
 
@@ -1786,8 +1879,10 @@ static int rkisp1_params_querycap(struct file *file,
 				  void *priv, struct v4l2_capability *cap)
 {
 	struct video_device *vdev = video_devdata(file);
+	struct rkisp1_isp_params_vdev *params_vdev = video_get_drvdata(vdev);
 
-	strcpy(cap->driver, DRIVER_NAME);
+	snprintf(cap->driver, sizeof(cap->driver),
+		 "%s_v%02d", DRIVER_NAME, params_vdev->dev->isp_ver);
 	strlcpy(cap->card, vdev->name, sizeof(cap->card));
 	strlcpy(cap->bus_info, "platform: " DRIVER_NAME, sizeof(cap->bus_info));
 
@@ -1957,7 +2052,8 @@ static void rkisp1_init_params_vdev(struct rkisp1_isp_params_vdev *params_vdev)
 	params_vdev->vdev_fmt.fmt.meta.buffersize =
 		sizeof(struct rkisp1_isp_params_cfg);
 
-	if (params_vdev->dev->isp_ver == ISP_V12) {
+	if (params_vdev->dev->isp_ver == ISP_V12 ||
+	    params_vdev->dev->isp_ver == ISP_V13) {
 		params_vdev->ops = &rkisp1_v12_isp_params_ops;
 		params_vdev->config = &rkisp1_v12_isp_params_config;
 	} else {

@@ -91,7 +91,7 @@ struct regval {
 struct ov13850_mode {
 	u32 width;
 	u32 height;
-	u32 max_fps;
+	struct v4l2_fract max_fps;
 	u32 hts_def;
 	u32 vts_def;
 	u32 exp_def;
@@ -578,15 +578,71 @@ static const struct regval ov13850_2112x1568_regs[] = {
 	{REG_NULL, 0x00},
 };
 
+/*
+ * Xclk 24Mhz
+ * max_framerate 7fps
+ * mipi_datarate per lane 600Mbps
+ */
+static const struct regval ov13850_4224x3136_regs[] = {
+	{0x3612, 0x2f},
+	{0x370a, 0x24},
+	{0x372a, 0x04},
+	{0x372f, 0xa0},
+	{0x3801, 0x0C},
+	{0x3805, 0x93},
+	{0x3807, 0x4B},
+	{0x3808, 0x10},
+	{0x3809, 0x80},
+	{0x380a, 0x0c},
+	{0x380b, 0x40},
+	{0x380e, 0x0d},
+	{0x380f, 0x00},
+	{0x3813, 0x04},
+	{0x3814, 0x11},
+	{0x3815, 0x11},
+	{0x3820, 0x00},
+	{0x3821, 0x04},
+	{0x3836, 0x04},
+	{0x3837, 0x01},
+	{0x4601, 0x87},
+	{0x4603, 0x01},
+	{0x4020, 0x02},
+	{0x4021, 0x4C},
+	{0x4022, 0x0E},
+	{0x4023, 0x37},
+	{0x4024, 0x0F},
+	{0x4025, 0x1C},
+	{0x4026, 0x0F},
+	{0x4027, 0x1F},
+	{0x4603, 0x00},
+	{0x5401, 0x71},
+	{0x5405, 0x80},
+	{REG_NULL, 0x00},
+};
+
 static const struct ov13850_mode supported_modes[] = {
 	{
 		.width = 2112,
 		.height = 1568,
-		.max_fps = 30,
+		.max_fps = {
+			.numerator = 10000,
+			.denominator = 300000,
+		},
 		.exp_def = 0x0600,
 		.hts_def = 0x12c0,
 		.vts_def = 0x0680,
 		.reg_list = ov13850_2112x1568_regs,
+	},{
+		.width = 4224,
+		.height = 3136,
+		.max_fps = {
+			.numerator = 20000,
+			.denominator = 150000,
+		},
+		.exp_def = 0x0600,
+		.hts_def = 0x12c0,
+		.vts_def = 0x0d00,
+		.reg_list = ov13850_4224x3136_regs,
 	},
 };
 
@@ -815,6 +871,19 @@ static int ov13850_enable_test_pattern(struct ov13850 *ov13850, u32 pattern)
 				 val);
 }
 
+static int ov13850_g_frame_interval(struct v4l2_subdev *sd,
+				    struct v4l2_subdev_frame_interval *fi)
+{
+	struct ov13850 *ov13850 = to_ov13850(sd);
+	const struct ov13850_mode *mode = ov13850->cur_mode;
+
+	mutex_lock(&ov13850->mutex);
+	fi->interval = mode->max_fps;
+	mutex_unlock(&ov13850->mutex);
+
+	return 0;
+}
+
 static int __ov13850_start_stream(struct ov13850 *ov13850)
 {
 	int ret;
@@ -1012,6 +1081,7 @@ static const struct v4l2_subdev_internal_ops ov13850_internal_ops = {
 
 static const struct v4l2_subdev_video_ops ov13850_video_ops = {
 	.s_stream = ov13850_s_stream,
+	.g_frame_interval = ov13850_g_frame_interval,
 };
 
 static const struct v4l2_subdev_pad_ops ov13850_pad_ops = {

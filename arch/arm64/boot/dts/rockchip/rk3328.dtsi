@@ -47,6 +47,7 @@
 #include <dt-bindings/pinctrl/rockchip.h>
 #include <dt-bindings/soc/rockchip,boot-mode.h>
 #include <dt-bindings/soc/rockchip-system-status.h>
+#include <dt-bindings/suspend/rockchip-rk3328.h>
 #include <dt-bindings/power/rk3328-power.h>
 #include <dt-bindings/thermal/thermal.h>
 #include "rk3328-dram-default-timing.dtsi"
@@ -193,6 +194,7 @@
 	rockchip_suspend: rockchip-suspend {
 		compatible = "rockchip,pm-rk3328";
 		status = "disabled";
+		rockchip,sleep-mode-config = <0>;
 		rockchip,virtual-poweroff = <0>;
 	};
 
@@ -219,6 +221,8 @@
 		clock-names = "i2s_clk", "i2s_hclk";
 		dmas = <&dmac 11>, <&dmac 12>;
 		dma-names = "tx", "rx";
+		resets = <&cru SRST_I2S0>, <&cru SRST_I2S0_H>;
+		reset-names = "reset-m", "reset-h";
 		status = "disabled";
 	};
 
@@ -230,6 +234,8 @@
 		clock-names = "i2s_clk", "i2s_hclk";
 		dmas = <&dmac 14>, <&dmac 15>;
 		dma-names = "tx", "rx";
+		resets = <&cru SRST_I2S1>, <&cru SRST_I2S1_H>;
+		reset-names = "reset-m", "reset-h";
 		status = "disabled";
 	};
 
@@ -241,6 +247,8 @@
 		clock-names = "i2s_clk", "i2s_hclk";
 		dmas = <&dmac 0>, <&dmac 1>;
 		dma-names = "tx", "rx";
+		resets = <&cru SRST_I2S2>, <&cru SRST_I2S2_H>;
+		reset-names = "reset-m", "reset-h";
 		pinctrl-names = "default", "sleep";
 		pinctrl-0 = <&i2s2m0_mclk
 			     &i2s2m0_sclk
@@ -420,10 +428,9 @@
 		assigned-clock-rates = <50000>;
 		resets = <&cru SRST_TSADC>;
 		reset-names = "tsadc-apb";
-		pinctrl-names = "init", "default", "sleep";
+		pinctrl-names = "gpio", "otpout";
 		pinctrl-0 = <&otp_gpio>;
 		pinctrl-1 = <&otp_out>;
-		pinctrl-2 = <&otp_gpio>;
 		#thermal-sensor-cells = <1>;
 		rockchip,hw-tshut-temp = <120000>;
 		status = "disabled";
@@ -1226,10 +1233,10 @@
 	sdmmc: dwmmc@ff500000 {
 		compatible = "rockchip,rk3328-dw-mshc", "rockchip,rk3288-dw-mshc";
 		reg = <0x0 0xff500000 0x0 0x4000>;
-		clock-freq-min-max = <400000 150000000>;
+		max-frequency = <150000000>;
 		clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>,
 			 <&cru SCLK_SDMMC_DRV>, <&cru SCLK_SDMMC_SAMPLE>;
-		clock-names = "biu", "ciu", "ciu-drv", "ciu-sample";
+		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
 		fifo-depth = <0x100>;
 		interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
 		status = "disabled";
@@ -1238,10 +1245,10 @@
 	sdio: dwmmc@ff510000 {
 		compatible = "rockchip,rk3328-dw-mshc", "rockchip,rk3288-dw-mshc";
 		reg = <0x0 0xff510000 0x0 0x4000>;
-		clock-freq-min-max = <400000 150000000>;
+		max-frequency = <150000000>;
 		clocks = <&cru HCLK_SDIO>, <&cru SCLK_SDIO>,
 			 <&cru SCLK_SDIO_DRV>, <&cru SCLK_SDIO_SAMPLE>;
-		clock-names = "biu", "ciu", "ciu-drv", "ciu-sample";
+		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
 		fifo-depth = <0x100>;
 		interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
 		status = "disabled";
@@ -1250,10 +1257,10 @@
 	emmc: dwmmc@ff520000 {
 		compatible = "rockchip,rk3328-dw-mshc", "rockchip,rk3288-dw-mshc";
 		reg = <0x0 0xff520000 0x0 0x4000>;
-		clock-freq-min-max = <400000 150000000>;
+		max-frequency = <150000000>;
 		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>,
 			 <&cru SCLK_EMMC_DRV>, <&cru SCLK_EMMC_SAMPLE>;
-		clock-names = "biu", "ciu", "ciu-drv", "ciu-sample";
+		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
 		fifo-depth = <0x100>;
 		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
 		status = "disabled";
@@ -1380,6 +1387,7 @@
 			snps,dis_u3_susphy_quirk;
 			snps,dis-del-phy-power-chg-quirk;
 			snps,tx-ipgap-linecheck-dis-quirk;
+			snps,xhci-trb-ent-quirk;
 			status = "disabled";
 		};
 	};

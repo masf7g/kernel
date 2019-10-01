@@ -832,8 +832,8 @@ static const struct phy_ops rockchip_usb2phy_ops = {
 
 /* Show & store the current value of otg mode for otg port */
 static ssize_t otg_mode_show(struct device *device,
-					      struct device_attribute *attr,
-					      char *buf)
+			     struct device_attribute *attr,
+			     char *buf)
 {
 	struct rockchip_usb2phy *rphy = dev_get_drvdata(device);
 	struct rockchip_usb2phy_port *rport = NULL;
@@ -868,8 +868,8 @@ static ssize_t otg_mode_show(struct device *device,
 }
 
 static ssize_t otg_mode_store(struct device *device,
-					       struct device_attribute *attr,
-					       const char *buf, size_t count)
+			      struct device_attribute *attr,
+			      const char *buf, size_t count)
 {
 	struct rockchip_usb2phy *rphy = dev_get_drvdata(device);
 	struct rockchip_usb2phy_port *rport = NULL;
@@ -1602,7 +1602,6 @@ static int rockchip_usb2phy_otg_port_init(struct rockchip_usb2phy *rphy,
 			ret = rockchip_set_vbus_power(rport, true);
 			if (ret)
 				return ret;
-
 		}
 		goto out;
 	}
@@ -2149,6 +2148,8 @@ static const struct rockchip_usb2phy_cfg rk1808_phy_cfgs[] = {
 				.bvalid_det_en	= { 0x0110, 2, 2, 0, 1 },
 				.bvalid_det_st	= { 0x0114, 2, 2, 0, 1 },
 				.bvalid_det_clr = { 0x0118, 2, 2, 0, 1 },
+				.bypass_dm_en	= { 0x0108, 2, 2, 0, 1},
+				.bypass_sel	= { 0x0108, 3, 3, 0, 1},
 				.iddig_output	= { 0x0100, 10, 10, 0, 1 },
 				.iddig_en	= { 0x0100, 9, 9, 0, 1 },
 				.idfall_det_en	= { 0x0110, 5, 5, 0, 1 },

@@ -7,6 +7,7 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/partitions.h>
 #include <linux/slab.h>
+#include <linux/string.h>
 
 #include "sfc_nor.h"
 #include "rkflash_blk.h"
@@ -156,6 +157,17 @@ static int sfc_read_mtd(struct mtd_info *mtd, loff_t from, size_t len,
 	return 0;
 }
 
+/*
+ * if not support rk_partition and partition is confirmed, you can define
+ * strust def_nor_part by adding new partition like following example:
+ *	{"u-boot", 0x1000 * 512, 0x2000 * 512},
+ * Note.
+ * 1. New partition format {name. size, offset}
+ * 2. Unit:Byte
+ * 3. Last partition 'size' can be set 0xFFFFFFFFF to fully user left space.
+ */
+struct mtd_partition def_nor_part[] = {};
+
 int sfc_nor_mtd_init(struct SFNOR_DEV *p_dev)
 {
 	int ret, i, part_num = 0;
@@ -188,7 +200,7 @@ int sfc_nor_mtd_init(struct SFNOR_DEV *p_dev)
 		goto free_dma_buf;
 	}
 	part_num = 0;
-	if (snor_read(p_dev, 0, 4, g_part) == 0) {
+	if (snor_read(p_dev, 0, 4, g_part) == 4) {
 		if (g_part->hdr.ui_fw_tag == RK_PARTITION_TAG) {
 			part_num = g_part->hdr.ui_part_entry_count;
 			for (i = 0; i < part_num; i++) {
@@ -204,13 +216,24 @@ int sfc_nor_mtd_init(struct SFNOR_DEV *p_dev)
 					(u64)g_part->part[i].ui_pt_sz << 9;
 				nor_parts[i].mask_flags = 0;
 			}
+		} else {
+			part_num = ARRAY_SIZE(def_nor_part);
+			for (i = 0; i < part_num; i++) {
+				nor_parts[i].name =
+					kstrdup(def_nor_part[i].name,
+						GFP_KERNEL);
+				if (def_nor_part[i].size == 0xFFFFFFFF)
+					def_nor_part[i].size = (capacity << 9) -
+						def_nor_part[i].offset;
+				nor_parts[i].offset =
+					def_nor_part[i].offset;
+				nor_parts[i].size =
+					def_nor_part[i].size;
+				nor_parts[i].mask_flags = 0;
+			}
 		}
 	}
 	kfree(g_part);
-	if (part_num == 0) {
-		ret = -1;
-		goto free_dma_buf;
-	}
 	ret = mtd_device_register(&p_dev->mtd, nor_parts, part_num);
 	if (ret != 0)
 		goto free_dma_buf;

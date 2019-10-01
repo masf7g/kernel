@@ -364,6 +364,7 @@ struct vpu_service_info {
 
 	bool auto_freq;
 	bool bug_dec_addr;
+	bool soft_reset;
 	atomic_t freq_status;
 
 	bool secure_isr;
@@ -445,6 +446,7 @@ struct vcodec_hw_ops {
 	void (*set_freq)(struct vpu_service_info *pservice,
 			 struct vpu_reg *reg);
 	void (*reduce_freq)(struct vpu_service_info *pservice);
+	void (*clr_cache)(struct vpu_service_info *pservice);
 };
 
 struct vcodec_hw_var {
@@ -462,15 +464,17 @@ struct compat_vpu_request {
 };
 #endif
 
-#define VDPU_CLEAN_CACHE_REG	516
-#define VEPU_CLEAN_CACHE_REG	772
-#define HEVC_CLEAN_CACHE_REG	260
+#define VDPU_CLR_CACHE_REG	516
+#define VEPU_CLR_CACHE_REG	772
+#define VDEC_CLR_CACHE0_REG	260
+#define VDEC_CLR_CACHE1_REG	276
 
-#define VPU_REG_ENABLE(base, reg)	writel_relaxed(1, base + reg)
+#define VPU_REG_EN(base, reg)	writel_relaxed(1, (base) + (reg))
 
-#define VDPU_CLEAN_CACHE(base)	VPU_REG_ENABLE(base, VDPU_CLEAN_CACHE_REG)
-#define VEPU_CLEAN_CACHE(base)	VPU_REG_ENABLE(base, VEPU_CLEAN_CACHE_REG)
-#define HEVC_CLEAN_CACHE(base)	VPU_REG_ENABLE(base, HEVC_CLEAN_CACHE_REG)
+#define VDPU_CLR_CACHE(base)	VPU_REG_EN(base, VDPU_CLR_CACHE_REG)
+#define VEPU_CLR_CACHE(base)	VPU_REG_EN(base, VEPU_CLR_CACHE_REG)
+#define VDEC_CLR_CACHE0(base)	VPU_REG_EN(base, VDEC_CLR_CACHE0_REG)
+#define VDEC_CLR_CACHE1(base)	VPU_REG_EN(base, VDEC_CLR_CACHE1_REG)
 
 #define VPU_POWER_OFF_DELAY		(4 * HZ) /* 4s */
 #define VPU_TIMEOUT_DELAY		(2 * HZ) /* 2s */
@@ -1015,17 +1019,18 @@ static int fill_scaling_list_pps(struct vpu_subdev_data *data,
 
 	if (scaling_fd > 0) {
 		int i = 0;
+		u32 val;
 		dma_addr_t tmp = vcodec_fd_to_iova(data, reg->session, reg,
 						   scaling_fd, -1);
 
 		if (IS_ERR_VALUE(tmp))
 			return tmp;
 		tmp += scaling_offset;
-		tmp = cpu_to_le32(tmp);
+		val = cpu_to_le32(tmp);
 
 		/* Fill the scaling list address in each pps entries */
 		for (i = 0; i < count; i++, base += pps_info_size)
-			memcpy(pps + base, &tmp, sizeof(tmp));
+			memcpy(pps + base, &val, sizeof(val));
 	}
 
 	dma_buf_vunmap(dmabuf, vaddr);
@@ -1442,7 +1447,7 @@ static void reg_copy_to_hw(struct vpu_subdev_data *data, struct vpu_reg *reg)
 			  "reg: base %3d end %d en %2d mask: en %x gate %x\n",
 			  base, end, reg_en, enable_mask, gating_mask);
 
-		VEPU_CLEAN_CACHE(dst);
+		VEPU_CLR_CACHE(dst);
 
 		if (debug & DEBUG_SET_REG)
 			for (i = base; i < end; i++)
@@ -1479,15 +1484,25 @@ static void reg_copy_to_hw(struct vpu_subdev_data *data, struct vpu_reg *reg)
 			  "reg: base %3d end %d en %2d mask: en %x gate %x\n",
 			  base, end, reg_en, enable_mask, gating_mask);
 
-		VDPU_CLEAN_CACHE(dst);
-
-		/* on rkvdec set cache size to 64byte */
-		if (pservice->dev_id == VCODEC_DEVICE_ID_RKVDEC) {
+		switch (data->mode) {
+		case VCODEC_RUNNING_MODE_HEVC: {
+			VDEC_CLR_CACHE0(dst);
+		} break;
+		case VCODEC_RUNNING_MODE_RKVDEC: {
+			/* on rkvdec set cache size to 64byte */
 			u32 *cache_base = dst + 0x100;
 			u32 val = (debug & DEBUG_CACHE_32B) ? (0x3) : (0x13);
 
 			writel_relaxed(val, cache_base + 0x07);
 			writel_relaxed(val, cache_base + 0x17);
+
+			VDEC_CLR_CACHE0(dst);
+			VDEC_CLR_CACHE1(dst);
+		} break;
+		case VCODEC_RUNNING_MODE_VPU:
+		default: {
+			VDPU_CLR_CACHE(dst);
+		} break;
 		}
 
 		if (debug & DEBUG_SET_REG)
@@ -1550,7 +1565,7 @@ static void reg_copy_to_hw(struct vpu_subdev_data *data, struct vpu_reg *reg)
 			  base, end, reg_en, enable_mask, gating_mask);
 
 		/* VDPU_SOFT_RESET(dst); */
-		VDPU_CLEAN_CACHE(dst);
+		VDPU_CLR_CACHE(dst);
 
 		if (debug & DEBUG_SET_REG)
 			for (i = base; i < end; i++)
@@ -3721,6 +3736,16 @@ static void get_hw_info(struct vpu_subdev_data *data)
 	} else {
 		dec->max_dec_pic_width = 4096;
 	}
+
+	/* in 3399 3228 and 3229 chips, avoid vpu timeout
+	 * and can't recover problem
+	 */
+	if (of_machine_is_compatible("rockchip,rk3399") ||
+		of_machine_is_compatible("rockchip,rk3228") ||
+		of_machine_is_compatible("rockchip,rk3229"))
+		pservice->soft_reset = true;
+	else
+		pservice->soft_reset = false;
 }
 
 static bool check_irq_err(struct vpu_task_info *task, u32 irq_status)
@@ -3838,8 +3863,8 @@ static irqreturn_t vdpu_isr(int irq, void *dev_id)
 				clear_bit(MMU_PAGEFAULT, &data->state);
 			}
 			reg_from_run_to_done(data, pservice->reg_codec);
-			/* avoid vpu timeout and can't recover problem */
-			vpu_soft_reset(data);
+			if (pservice->soft_reset)
+				vpu_soft_reset(data);
 		}
 	}
 

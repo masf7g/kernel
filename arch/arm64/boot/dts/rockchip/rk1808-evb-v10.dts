@@ -12,7 +12,29 @@
 	compatible = "rockchip,rk1808-evb-v10", "rockchip,rk1808";
 
 	chosen {
-		bootargs = "earlycon=uart8250,mmio32,0xff550000 console=ttyFIQ0 root=/dev/mmcblk1p8 rootfstype=ext4 rootwait swiotlb=1 kpti=0";
+		bootargs = "earlycon=uart8250,mmio32,0xff550000 console=ttyFIQ0 root=PARTUUID=614e0000-0000 rootfstype=ext4 rootwait swiotlb=1 kpti=0 snd_aloop.index=7";
+	};
+
+	vad-sound {
+		status = "okay";
+		compatible = "rockchip,multicodecs-card";
+		rockchip,card-name = "rockchip,rk1808-vad";
+		rockchip,cpu = <&i2s0>;
+		rockchip,codec = <&vad>;
+	};
+};
+
+&adc_key {
+	vol-down-key {
+		linux,code = <KEY_VOLUMEDOWN>;
+		label = "volume down";
+		press-threshold-microvolt = <300000>;
+	};
+
+	vol-up-key {
+		linux,code = <KEY_VOLUMEUP>;
+		label = "volume up";
+		press-threshold-microvolt = <18000>;
 	};
 };
 
@@ -27,6 +49,7 @@
 		compatible = "sitronix,st7703", "simple-panel-dsi";
 		reg = <0>;
 		backlight = <&backlight>;
+		enable-gpios = <&gpio0 RK_PC4 GPIO_ACTIVE_HIGH>;
 		power-supply = <&vcc5v0_sys>;
 		prepare-delay-ms = <2>;
 		reset-delay-ms = <1>;
@@ -113,14 +136,146 @@
 	};
 };
 
+&i2c3 {
+	status = "okay";
+
+	clock-frequency = <100000>;
+
+	ov5695: ov5695@36 {
+		compatible = "ovti,ov5695";
+		reg = <0x36>;
+		clocks = <&cru SCLK_CIF_OUT>;
+		clock-names = "xvclk";
+		avdd-supply = <&vcc2v8_dvp>;
+		dovdd-supply = <&vdd1v5_dvp>;
+		dvdd-supply = <&vcc1v8_dvp>;
+		pwdn-gpios = <&gpio0 23 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&cif_clkout_m0>;
+		port {
+			ucam_out: endpoint {
+				remote-endpoint = <&mipi_in_ucam>;
+				data-lanes = <1 2>;
+			};
+		};
+	};
+};
+
+&i2s0 {
+	status = "okay";
+	#sound-dai-cells = <0>;
+};
+
+&i2s1 {
+	status = "okay";
+	#sound-dai-cells = <0>;
+};
+
+&isp_mmu {
+	status = "okay";
+};
+
 &mipi_dphy {
 	status = "okay";
+};
+
+&mipi_dphy_rx {
+	status = "okay";
+
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			reg = <0>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			mipi_in_ucam: endpoint@1 {
+				reg = <1>;
+				remote-endpoint = <&ucam_out>;
+				data-lanes = <1 2>;
+			};
+		};
+
+		port@1 {
+			reg = <1>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			dphy_rx0_out: endpoint@0 {
+				reg = <0>;
+				remote-endpoint = <&isp0_mipi_in>;
+			};
+		};
+	};
+};
+
+&rk_rga {
+	status =  "okay";
+};
+
+&rk809_sound {
+	status = "okay";
+};
+
+&rkisp1 {
+	status = "okay";
+
+	port {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		isp0_mipi_in: endpoint@0 {
+			reg = <0>;
+			remote-endpoint = <&dphy_rx0_out>;
+		};
+	};
+};
+
+&rng {
+	status = "okay";
+};
+
+&rockchip_suspend {
+	status = "okay";
+	rockchip,sleep-debug-en = <1>;
 };
 
 &route_dsi {
 	status = "disabled";
 };
 
+&tsadc {
+	rockchip,hw-tshut-mode = <1>; /* tshut mode 0:CRU 1:GPIO */
+	rockchip,hw-tshut-polarity = <0>; /* tshut polarity 0:LOW 1:HIGH */
+	pinctrl-names = "gpio", "otpout";
+	pinctrl-0 = <&tsadc_otp_gpio>;
+	pinctrl-1 = <&tsadc_otp_out>;
+	status = "okay";
+};
+
+&vad {
+	status = "okay";
+	rockchip,audio-src = <&i2s0>;
+	rockchip,buffer-time-ms = <200>;
+	rockchip,det-channel = <0>;
+	rockchip,mode = <1>;
+	#sound-dai-cells = <0>;
+};
+
 &vop_lite {
+	status = "okay";
+};
+
+&vopl_mmu {
+	status = "okay";
+};
+
+&vpu_mmu {
+	status = "okay";
+};
+
+&vpu_service {
 	status = "okay";
 };
