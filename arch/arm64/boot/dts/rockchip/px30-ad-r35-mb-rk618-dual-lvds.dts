@@ -17,11 +17,6 @@
 		enable-delay-ms = <120>;
 		disable-delay-ms = <120>;
 		unprepare-delay-ms = <120>;
-		/*
-		 * MEDIA_BUS_FMT_RGB888_1X7X4_SPWG  - "vesa-24"
-		 * MEDIA_BUS_FMT_RGB888_1X7X4_JEIDA - "jedia-24"
-		 * MEDIA_BUS_FMT_RGB666_1X7X3_SPWG  - "jedia-18"
-		 */
 		bus-format = <MEDIA_BUS_FMT_RGB888_1X7X4_SPWG>;
 		width-mm = <476>;
 		height-mm = <268>;
@@ -69,7 +64,7 @@
 		clocks = <&cru SCLK_I2S1_OUT>;
 		clock-names = "clkin";
 		assigned-clocks = <&cru SCLK_I2S1_OUT>;
-		assigned-clock-rates = <12000000>;
+		assigned-clock-rates = <11289600>;
 		reset-gpios = <&gpio0 RK_PA0 GPIO_ACTIVE_LOW>;
 		status = "okay";
 

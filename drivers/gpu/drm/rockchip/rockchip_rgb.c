@@ -26,6 +26,7 @@
 #include <linux/regmap.h>
 #include <linux/mfd/syscon.h>
 #include <linux/phy/phy.h>
+#include <uapi/linux/videodev2.h>
 
 #include "rockchip_drm_drv.h"
 #include "rockchip_drm_vop.h"
@@ -180,6 +181,12 @@ rockchip_rgb_encoder_atomic_check(struct drm_encoder *encoder,
 	case MEDIA_BUS_FMT_RGB565_1X16:
 		s->output_mode = ROCKCHIP_OUT_MODE_P565;
 		break;
+	case MEDIA_BUS_FMT_SRGB888_3X8:
+		s->output_mode = ROCKCHIP_OUT_MODE_S888;
+		break;
+	case MEDIA_BUS_FMT_SRGB888_DUMMY_4X8:
+		s->output_mode = ROCKCHIP_OUT_MODE_S888_DUMMY;
+		break;
 	case MEDIA_BUS_FMT_RGB888_1X24:
 	case MEDIA_BUS_FMT_RGB666_1X24_CPADHI:
 	default:
@@ -188,6 +195,20 @@ rockchip_rgb_encoder_atomic_check(struct drm_encoder *encoder,
 	}
 
 	s->output_type = DRM_MODE_CONNECTOR_DPI;
+	s->tv_state = &conn_state->tv;
+	s->eotf = TRADITIONAL_GAMMA_SDR;
+	s->color_space = V4L2_COLORSPACE_DEFAULT;
+
+	return 0;
+}
+
+static int rockchip_rgb_encoder_loader_protect(struct drm_encoder *encoder,
+					       bool on)
+{
+	struct rockchip_rgb *rgb = encoder_to_rgb(encoder);
+
+	if (rgb->panel)
+		drm_panel_loader_protect(rgb->panel, on);
 
 	return 0;
 }
@@ -197,6 +218,7 @@ struct drm_encoder_helper_funcs rockchip_rgb_encoder_helper_funcs = {
 	.enable = rockchip_rgb_encoder_enable,
 	.disable = rockchip_rgb_encoder_disable,
 	.atomic_check = rockchip_rgb_encoder_atomic_check,
+	.loader_protect = rockchip_rgb_encoder_loader_protect,
 };
 
 static const struct drm_encoder_funcs rockchip_rgb_encoder_funcs = {
