@@ -35,6 +35,9 @@
 #define PX30_RGB_DATA_SYNC_BYPASS(v)	HIWORD_UPDATE(v, 3, 3)
 #define PX30_RGB_VOP_SEL(v)		HIWORD_UPDATE(v, 2, 2)
 
+#define RK1808_GRF_PD_VO_CON1		0x0444
+#define RK1808_RGB_DATA_SYNC_BYPASS(v)	HIWORD_UPDATE(v, 3, 3)
+
 struct rockchip_rgb;
 
 struct rockchip_rgb_funcs {
@@ -323,8 +326,26 @@ static const struct rockchip_rgb_funcs px30_rgb_funcs = {
 	.disable = px30_rgb_disable,
 };
 
+static void rk1808_rgb_enable(struct rockchip_rgb *rgb)
+{
+	regmap_write(rgb->grf, RK1808_GRF_PD_VO_CON1,
+		     RK1808_RGB_DATA_SYNC_BYPASS(1));
+}
+
+static void rk1808_rgb_disable(struct rockchip_rgb *rgb)
+{
+	regmap_write(rgb->grf, PX30_GRF_PD_VO_CON1,
+		     RK1808_RGB_DATA_SYNC_BYPASS(0));
+}
+
+static const struct rockchip_rgb_funcs rk1808_rgb_funcs = {
+	.enable = rk1808_rgb_enable,
+	.disable = rk1808_rgb_disable,
+};
+
 static const struct of_device_id rockchip_rgb_dt_ids[] = {
 	{ .compatible = "rockchip,px30-rgb", .data = &px30_rgb_funcs },
+	{ .compatible = "rockchip,rk1808-rgb", .data = &rk1808_rgb_funcs },
 	{ .compatible = "rockchip,rk3066-rgb", },
 	{ .compatible = "rockchip,rk3308-rgb", },
 	{ .compatible = "rockchip,rv1108-rgb", },
