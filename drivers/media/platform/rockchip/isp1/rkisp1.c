@@ -244,14 +244,17 @@ static void rkisp1_config_ism(struct rkisp1_device *dev)
 	void __iomem *base = dev->base_addr;
 	struct v4l2_rect *out_crop = &dev->isp_sdev.out_crop;
 	u32 val;
+	u32 mult = 1;
 
+	if (dev->isp_sdev.in_fmt.fmt_type == FMT_RGB)
+		mult = 3;
 	writel(0, base + CIF_ISP_IS_RECENTER);
 	writel(0, base + CIF_ISP_IS_MAX_DX);
 	writel(0, base + CIF_ISP_IS_MAX_DY);
 	writel(0, base + CIF_ISP_IS_DISPLACE);
-	writel(out_crop->left, base + CIF_ISP_IS_H_OFFS);
+	writel(mult * out_crop->left, base + CIF_ISP_IS_H_OFFS);
 	writel(out_crop->top, base + CIF_ISP_IS_V_OFFS);
-	writel(out_crop->width, base + CIF_ISP_IS_H_SIZE);
+	writel(mult * out_crop->width, base + CIF_ISP_IS_H_SIZE);
 	if (dev->stream[RKISP1_STREAM_SP].interlaced)
 		writel(out_crop->height / 2, base + CIF_ISP_IS_V_SIZE);
 	else
@@ -280,6 +283,7 @@ static int rkisp1_config_isp(struct rkisp1_device *dev)
 	u32 signal = 0;
 	u32 acq_mult = 0;
 	u32 acq_prop = 0;
+	u32 out_mult = 1;
 
 	sensor = dev->active_sensor;
 	in_frm = &dev->isp_sdev.in_frm;
@@ -332,6 +336,13 @@ static int rkisp1_config_isp(struct rkisp1_device *dev)
 		irq_mask |= CIF_ISP_DATA_LOSS;
 		if (dev->isp_inp == INP_DMARX_ISP)
 			acq_prop = CIF_ISP_ACQ_PROP_DMA_YUV;
+	} else if (in_fmt->fmt_type == FMT_RGB) {
+		acq_mult = 3;
+		out_mult = 3;
+		if (sensor && sensor->mbus.type == V4L2_MBUS_BT656)
+			isp_ctrl = CIF_ISP_CTRL_ISP_MODE_ITU656;
+		else
+			isp_ctrl = CIF_ISP_CTRL_ISP_MODE_RAW_PICT;
 	}
 
 	/* Set up input acquisition properties */
@@ -363,9 +374,9 @@ static int rkisp1_config_isp(struct rkisp1_device *dev)
 	writel(acq_mult * in_frm->width, base + CIF_ISP_ACQ_H_SIZE);
 
 	/* ISP Out Area */
-	writel(in_crop->left, base + CIF_ISP_OUT_H_OFFS);
+	writel(out_mult * in_crop->left, base + CIF_ISP_OUT_H_OFFS);
 	writel(in_crop->top, base + CIF_ISP_OUT_V_OFFS);
-	writel(in_crop->width, base + CIF_ISP_OUT_H_SIZE);
+	writel(out_mult * in_crop->width, base + CIF_ISP_OUT_H_SIZE);
 
 	if (dev->stream[RKISP1_STREAM_SP].interlaced) {
 		writel(in_frm->height / 2, base + CIF_ISP_ACQ_V_SIZE);
@@ -1020,6 +1031,11 @@ static const struct ispsd_in_fmt rkisp1_isp_input_formats[] = {
 		.mipi_dt	= CIF_CSI2_DT_RAW12,
 		.yuv_seq	= CIF_ISP_ACQ_PROP_YCBYCR,
 		.bus_width	= 12,
+	}, {
+		.mbus_code	= MEDIA_BUS_FMT_RGB888_1X24,
+		.fmt_type	= FMT_RGB,
+		.mipi_dt	= CIF_CSI2_DT_RGB888,
+		.bus_width	= 24,
 	}
 };
 
@@ -1063,7 +1079,10 @@ static const struct ispsd_out_fmt rkisp1_isp_output_formats[] = {
 	}, {
 		.mbus_code	= MEDIA_BUS_FMT_SGRBG8_1X8,
 		.fmt_type	= FMT_BAYER,
-	},
+	}, {
+		.mbus_code	= MEDIA_BUS_FMT_RGB888_1X24,
+		.fmt_type	= FMT_BAYER,
+	}
 };
 
 static const struct ispsd_in_fmt *find_in_fmt(u32 mbus_code)
@@ -1154,6 +1173,7 @@ static void rkisp1_isp_sd_try_fmt(struct v4l2_subdev *sd,
 	struct rkisp1_isp_subdev *isp_sd = &isp_dev->isp_sdev;
 	const struct ispsd_in_fmt *in_fmt;
 	const struct ispsd_out_fmt *out_fmt;
+	u32 max_width, max_height;
 
 	switch (pad) {
 	case RKISP1_ISP_PAD_SINK:
@@ -1163,28 +1183,30 @@ static void rkisp1_isp_sd_try_fmt(struct v4l2_subdev *sd,
 		else
 			fmt->code = MEDIA_BUS_FMT_SRGGB10_1X10;
 
-		if (isp_dev->isp_ver == ISP_V12) {
-			fmt->width  = clamp_t(u32, fmt->width,
-				      CIF_ISP_INPUT_W_MIN,
-				      CIF_ISP_INPUT_W_MAX_V12);
-			fmt->height = clamp_t(u32, fmt->height,
-				      CIF_ISP_INPUT_H_MIN,
-				      CIF_ISP_INPUT_H_MAX_V12);
-		} else if (isp_dev->isp_ver == ISP_V13) {
-			fmt->width  = clamp_t(u32, fmt->width,
-				      CIF_ISP_INPUT_W_MIN,
-				      CIF_ISP_INPUT_W_MAX_V13);
-			fmt->height = clamp_t(u32, fmt->height,
-				      CIF_ISP_INPUT_H_MIN,
-				      CIF_ISP_INPUT_H_MAX_V13);
+		if (in_fmt && in_fmt->fmt_type == FMT_YUV) {
+			max_width = CIF_ISP_INPUT_W_MAX;
+			max_height = CIF_ISP_INPUT_H_MAX;
 		} else {
-			fmt->width  = clamp_t(u32, fmt->width,
-				      CIF_ISP_INPUT_W_MIN,
-				      CIF_ISP_INPUT_W_MAX);
-			fmt->height = clamp_t(u32, fmt->height,
-				      CIF_ISP_INPUT_H_MIN,
-				      CIF_ISP_INPUT_H_MAX);
+			switch (isp_dev->isp_ver) {
+			case ISP_V12:
+				max_width = CIF_ISP_INPUT_W_MAX_V12;
+				max_height = CIF_ISP_INPUT_H_MAX_V12;
+				break;
+			case ISP_V13:
+				max_width = CIF_ISP_INPUT_W_MAX_V13;
+				max_height = CIF_ISP_INPUT_H_MAX_V13;
+				break;
+			default:
+				max_width = CIF_ISP_INPUT_W_MAX;
+				max_height = CIF_ISP_INPUT_H_MAX;
+			}
 		}
+		fmt->width  = clamp_t(u32, fmt->width,
+			      CIF_ISP_INPUT_W_MIN,
+			      max_width);
+		fmt->height = clamp_t(u32, fmt->height,
+			      CIF_ISP_INPUT_H_MIN,
+			      max_height);
 		break;
 	case RKISP1_ISP_PAD_SOURCE_PATH:
 		out_fmt = find_out_fmt(fmt->code);

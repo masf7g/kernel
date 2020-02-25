@@ -632,7 +632,6 @@ static int probe_width(struct vpu_reg *reg)
 	int type = -1;
 
 	if (reg->type != VPU_DEC && reg->type != VPU_DEC_PP) {
-		pr_info("type is not dec or pp, return\n");
 		return -1;
 	}
 	if (reg->task->get_fmt) {
@@ -4016,12 +4015,13 @@ static void get_hw_info(struct vpu_subdev_data *data)
 		dec->max_dec_pic_width = 4096;
 	}
 
-	/* in 3399 3228 and 3229 chips, avoid vpu timeout
+	/* in 3399 3228 3229 and 1808 chips, avoid vpu timeout
 	 * and can't recover problem
 	 */
 	if (of_machine_is_compatible("rockchip,rk3399") ||
 		of_machine_is_compatible("rockchip,rk3228") ||
-		of_machine_is_compatible("rockchip,rk3229"))
+		of_machine_is_compatible("rockchip,rk3229") ||
+		of_machine_is_compatible("rockchip,rk1808"))
 		pservice->soft_reset = true;
 	else
 		pservice->soft_reset = false;

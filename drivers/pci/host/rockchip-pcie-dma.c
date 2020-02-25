@@ -362,6 +362,10 @@ static int rk_pcie_misc_open(struct inode *inode, struct file *filp)
 
 	filp->private_data = pcie_misc_dev->obj;
 
+	mutex_lock(&pcie_misc_dev->obj->count_mutex);
+	if (pcie_misc_dev->obj->ref_count++)
+		goto already_opened;
+
 	pcie_misc_dev->obj->loop_count = 0;
 	pcie_misc_dev->obj->local_read_available = 0x0;
 	pcie_misc_dev->obj->local_write_available = 0xff;
@@ -370,13 +374,23 @@ static int rk_pcie_misc_open(struct inode *inode, struct file *filp)
 
 	pr_info("Open pcie misc device success\n");
 
+already_opened:
+	mutex_unlock(&pcie_misc_dev->obj->count_mutex);
 	return 0;
 }
 
 static int rk_pcie_misc_release(struct inode *inode, struct file *filp)
 {
+	struct dma_trx_obj *obj = filp->private_data;
+
+	mutex_lock(&obj->count_mutex);
+	if (--obj->ref_count)
+		goto still_opened;
+
 	pr_info("Close pcie misc device\n");
 
+still_opened:
+	mutex_unlock(&obj->count_mutex);
 	return 0;
 }
 
@@ -510,6 +524,11 @@ static const struct file_operations rk_pcie_misc_fops = {
 	.poll		= rk_pcie_misc_poll,
 };
 
+static void rk_pcie_delete_misc(struct dma_trx_obj *obj)
+{
+	misc_deregister(&obj->pcie_dev->dev);
+}
+
 static int rk_pcie_add_misc(struct dma_trx_obj *obj)
 {
 	int ret;
@@ -531,6 +550,7 @@ static int rk_pcie_add_misc(struct dma_trx_obj *obj)
 	}
 
 	pcie_dev->obj = obj;
+	obj->pcie_dev = pcie_dev;
 
 	pr_info("register misc device pcie-dev\n");
 
@@ -561,6 +581,11 @@ static void *rk_pcie_map_kernel(phys_addr_t start, size_t len)
 	vfree(p);
 
 	return vaddr;
+}
+
+static void rk_pcie_unmap_kernel(void *vaddr)
+{
+	vunmap(vaddr);
 }
 
 static void rk_pcie_dma_table_free(struct dma_trx_obj *obj, int num)
@@ -715,8 +740,10 @@ struct dma_trx_obj *rk_pcie_dma_obj_probe(struct device *dev)
 
 	obj->irq_num = 0;
 	obj->loop_count_threshold = 0;
+	obj->ref_count = 0;
 	init_completion(&obj->done);
 
+	mutex_init(&obj->count_mutex);
 	rk_pcie_add_misc(obj);
 
 #ifdef CONFIG_DEBUG_FS
@@ -736,3 +763,18 @@ free_dma_table:
 	return obj;
 }
 EXPORT_SYMBOL_GPL(rk_pcie_dma_obj_probe);
+
+void rk_pcie_dma_obj_remove(struct dma_trx_obj *obj)
+{
+	hrtimer_cancel(&obj->scan_timer);
+	destroy_hrtimer_on_stack(&obj->scan_timer);
+	rk_pcie_delete_misc(obj);
+	rk_pcie_unmap_kernel(obj->mem_base);
+	rk_pcie_dma_table_free(obj, PCIE_DMA_TABLE_NUM);
+	destroy_workqueue(obj->dma_trx_wq);
+
+#ifdef CONFIG_DEBUG_FS
+	debugfs_remove_recursive(obj->pcie_root);
+#endif
+}
+EXPORT_SYMBOL_GPL(rk_pcie_dma_obj_remove);
